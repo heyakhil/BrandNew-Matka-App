@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BackHandler,
   Linking,
@@ -7,31 +7,30 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import {
-  BottomNavigation,
-  Button,
-  Dialog,
-  Icon,
-  PaperProvider,
-  Portal,
-  Snackbar,
-  Surface,
-  Text,
-} from 'react-native-paper';
+import { Button, Dialog, PaperProvider, Portal, Snackbar, Text } from 'react-native-paper';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { NoticeTicker } from './src/components/molecules/NoticeTicker';
-import { TopAppBar } from './src/components/molecules/TopAppBar';
+import { HomeHeader } from './src/components/molecules/HomeHeader';
+import { ScreenHeader } from './src/components/molecules/ScreenHeader';
 import { AppDrawerModal } from './src/components/organisms/AppDrawerModal';
+import { BottomTabBar } from './src/components/organisms/BottomTabBar';
 import { MarketChartModal } from './src/components/organisms/MarketChartModal';
+import {
+  TELEGRAM_URL,
+  WHATSAPP_APP_URL,
+  WHATSAPP_WEB_URL,
+} from './src/constants/support';
 import { INITIAL_MARKETS, INITIAL_TRANSACTIONS } from './src/data/mockData';
 import { BidHistoryScreen } from './src/screens/BidHistoryScreen';
+import { FundsScreen } from './src/screens/FundsScreen';
 import { GameRatesScreen } from './src/screens/GameRatesScreen';
 import { GameResultScreen } from './src/screens/GameResultScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { MarketGamesScreen } from './src/screens/MarketGamesScreen';
+import { MyBidsScreen } from './src/screens/MyBidsScreen';
+import { PassbookScreen } from './src/screens/PassbookScreen';
 import {
   PlayGameScreen,
   type SubmittedBidItem,
@@ -44,15 +43,14 @@ import {
 import { GameTimingScreen } from './src/screens/SidebarScreens/GameTimingScreen';
 import { NoticeScreen } from './src/screens/SidebarScreens/NoticeScreen';
 import { ProfileScreen } from './src/screens/SidebarScreens/ProfileScreen';
-import { TransactionsListScreen } from './src/screens/SidebarScreens/TransactionsListScreen';
-import { WithdrawFundScreen } from './src/screens/SidebarScreens/WithdrawFundScreen';
-import { WalletScreen, type WalletSubView } from './src/screens/WalletScreen';
 import { APP_COLORS, royalMatkaTheme } from './src/theme/paperTheme';
 import type {
   BankDetails,
   BidRecord,
+  FundsSubView,
   MarketGameOption,
   MarketItem,
+  MyBidsSubView,
   SidebarScreenKey,
   TabKey,
   UserProfile,
@@ -60,51 +58,30 @@ import type {
 } from './src/types/matka';
 import { formatRupees } from './src/utils/matkaHelpers';
 
-const WHATSAPP_APP_URL =
-  'whatsapp://send?phone=919999999999&text=Hello%20RoyalClubMatka%20Support';
-const WHATSAPP_WEB_URL =
-  'https://wa.me/919999999999?text=Hello%20RoyalClubMatka%20Support';
-const TELEGRAM_URL = 'https://t.me/RoyalClubMatka';
+const SIDEBAR_TITLES: Record<SidebarScreenKey, string> = {
+  profile: 'Profile',
+  notice: 'Notice',
+  gameRates: 'Game Rate',
+  gameTiming: 'Game Timing',
+  gameChart: 'Game Chart',
+  changePassword: 'Change Password',
+};
 
-interface NavRoute {
-  key: TabKey;
-  title: string;
-  focusedIcon: string;
-  unfocusedIcon: string;
-}
+const BIDS_TITLES: Record<MyBidsSubView, string> = {
+  menu: 'My Bids',
+  bidHistory: 'Bid History',
+  gameResults: 'Game Results',
+};
 
-const BOTTOM_ROUTES: NavRoute[] = [
-  {
-    key: 'history',
-    title: 'History',
-    focusedIcon: 'book-open-variant',
-    unfocusedIcon: 'book-open-outline',
-  },
-  {
-    key: 'allBids',
-    title: 'All Bids',
-    focusedIcon: 'history',
-    unfocusedIcon: 'history',
-  },
-  {
-    key: 'home',
-    title: 'Home',
-    focusedIcon: 'home',
-    unfocusedIcon: 'home-outline',
-  },
-  {
-    key: 'wallet',
-    title: 'Wallet',
-    focusedIcon: 'wallet',
-    unfocusedIcon: 'wallet-outline',
-  },
-  {
-    key: 'chat',
-    title: 'WhatsApp',
-    focusedIcon: 'whatsapp',
-    unfocusedIcon: 'whatsapp',
-  },
-];
+const FUNDS_TITLES: Record<FundsSubView, string> = {
+  menu: 'Funds',
+  addFund: 'Add Fund',
+  withdraw: 'Withdraw Fund',
+  bank: 'Add Bank Details',
+  upi: 'Add UPI Details',
+  depositHistory: 'Fund Deposit History',
+  withdrawHistory: 'Fund Withdraw History',
+};
 
 function AppShell(): React.JSX.Element {
   const insets = useSafeAreaInsets();
@@ -115,7 +92,8 @@ function AppShell(): React.JSX.Element {
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
-  const [walletSubView, setWalletSubView] = useState<WalletSubView>('menu');
+  const [fundsSubView, setFundsSubView] = useState<FundsSubView>('menu');
+  const [bidsSubView, setBidsSubView] = useState<MyBidsSubView>('menu');
   const [selectedChart, setSelectedChart] = useState<SelectedChart | null>(null);
 
   const [profile, setProfile] = useState<UserProfile>({
@@ -142,106 +120,107 @@ function AppShell(): React.JSX.Element {
   const [chartMarket, setChartMarket] = useState<MarketItem | null>(null);
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    const subscription = BackHandler.addEventListener(
-      'hardwareBackPress',
-      () => {
-        if (logoutDialogOpen) {
-          setLogoutDialogOpen(false);
-          return true;
-        }
-        if (drawerOpen) {
-          setDrawerOpen(false);
-          return true;
-        }
-        if (chartMarket) {
-          setChartMarket(null);
-          return true;
-        }
-        if (sidebarScreen === 'gameChart' && selectedChart) {
-          setSelectedChart(null);
-          return true;
-        }
-        if (sidebarScreen) {
-          setSidebarScreen(null);
-          return true;
-        }
-        if (activeTab === 'wallet' && walletSubView !== 'menu') {
-          setWalletSubView('menu');
-          return true;
-        }
-        if (selectedGame) {
-          setSelectedGame(null);
-          return true;
-        }
-        if (selectedMarket) {
-          setSelectedMarket(null);
-          return true;
-        }
-        if (activeTab !== 'home') {
-          setActiveTab('home');
-          return true;
-        }
-        return false;
-      },
-    );
-
-    return () => subscription.remove();
+  const handleBack = useCallback((): boolean => {
+    if (logoutDialogOpen) {
+      setLogoutDialogOpen(false);
+    } else if (drawerOpen) {
+      setDrawerOpen(false);
+    } else if (chartMarket) {
+      setChartMarket(null);
+    } else if (sidebarScreen === 'gameChart' && selectedChart) {
+      setSelectedChart(null);
+    } else if (sidebarScreen) {
+      setSidebarScreen(null);
+    } else if (activeTab === 'wallet' && fundsSubView !== 'menu') {
+      setFundsSubView('menu');
+    } else if (activeTab === 'allBids' && bidsSubView !== 'menu') {
+      setBidsSubView('menu');
+    } else if (selectedGame) {
+      setSelectedGame(null);
+    } else if (selectedMarket) {
+      setSelectedMarket(null);
+    } else if (activeTab !== 'home') {
+      setActiveTab('home');
+    } else {
+      return false;
+    }
+    return true;
   }, [
     logoutDialogOpen,
     drawerOpen,
     chartMarket,
     selectedChart,
     sidebarScreen,
-    walletSubView,
+    fundsSubView,
+    bidsSubView,
     selectedGame,
     selectedMarket,
     activeTab,
   ]);
 
-  const tabIndex = useMemo(
-    () => BOTTOM_ROUTES.findIndex(r => r.key === activeTab),
-    [activeTab],
-  );
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBack,
+    );
+    return () => subscription.remove();
+  }, [handleBack]);
 
   const currentTitle = useMemo(() => {
     if (sidebarScreen) {
-      const titles: Record<SidebarScreenKey, string> = {
-        profile: 'Profile',
-        withdrawHistory: 'Withdraw History',
-        notice: 'Notice',
-        gameRates: 'Game Rate',
-        withdrawRequest: 'Withdraw Fund',
-        transaction: 'Transaction',
-        gameTiming: 'Game Timing',
-        gameChart: 'Game Chart',
-        changePassword: 'Change Password',
-      };
-      return titles[sidebarScreen];
+      return SIDEBAR_TITLES[sidebarScreen];
     }
-    switch (activeTab) {
-      case 'history':
-        return 'Game Result';
-      case 'allBids':
-        return 'Bid History';
-      case 'wallet':
-        return 'Wallet';
-      default:
-        return '';
+    if (selectedMarket) {
+      return selectedMarket.name;
     }
-  }, [activeTab, sidebarScreen]);
+    if (activeTab === 'allBids') {
+      return BIDS_TITLES[bidsSubView];
+    }
+    if (activeTab === 'wallet') {
+      return FUNDS_TITLES[fundsSubView];
+    }
+    return 'Passbook';
+  }, [activeTab, bidsSubView, fundsSubView, selectedMarket, sidebarScreen]);
 
-  const handleOpenWhatsApp = async (): Promise<void> => {
+  const resetNavigation = (): void => {
+    setSidebarScreen(null);
+    setSelectedGame(null);
+    setSelectedMarket(null);
+    setSelectedChart(null);
+    setFundsSubView('menu');
+    setBidsSubView('menu');
+  };
+
+  const openFunds = (view: FundsSubView): void => {
+    resetNavigation();
+    setFundsSubView(view);
+    setActiveTab('wallet');
+  };
+
+  const openUrl = async (url: string, fallbackUrl: string | null, errorMessage: string): Promise<void> => {
     try {
-      await Linking.openURL(WHATSAPP_APP_URL);
+      await Linking.openURL(url);
     } catch {
       try {
-        await Linking.openURL(WHATSAPP_WEB_URL);
+        if (!fallbackUrl) {
+          throw new Error('No fallback URL');
+        }
+        await Linking.openURL(fallbackUrl);
       } catch {
-        setSnackbarMessage('Unable to open WhatsApp on this device.');
+        setSnackbarMessage(errorMessage);
       }
     }
   };
+
+  const handleOpenWhatsApp = (): Promise<void> =>
+    openUrl(
+      WHATSAPP_APP_URL,
+      WHATSAPP_WEB_URL,
+      'Unable to open WhatsApp on this device.',
+    );
+
+  const handleJoinTelegram = (): Promise<void> =>
+    openUrl(TELEGRAM_URL, null, 'Unable to open Telegram right now.');
 
   const handleShareApp = async (): Promise<void> => {
     try {
@@ -254,30 +233,19 @@ function AppShell(): React.JSX.Element {
     }
   };
 
-  const handleJoinTelegram = async (): Promise<void> => {
-    try {
-      await Linking.openURL(TELEGRAM_URL);
-    } catch {
-      setSnackbarMessage('Unable to open Telegram right now.');
-    }
-  };
-
-  const handleTabPress = (
-    key: TabKey,
-    preventDefault: () => void,
-  ): void => {
+  const handleTabPress = (key: TabKey): void => {
     if (key === 'chat') {
-      preventDefault();
       handleOpenWhatsApp();
       return;
     }
     setSelectedGame(null);
     setSelectedMarket(null);
-    setSidebarScreen(null);
-    if (key !== activeTab || sidebarScreen || selectedMarket) {
-      setWalletSubView('menu');
-    }
     setSelectedChart(null);
+    if (key !== activeTab || sidebarScreen || selectedMarket) {
+      setFundsSubView('menu');
+      setBidsSubView('menu');
+    }
+    setSidebarScreen(null);
     setActiveTab(key);
   };
 
@@ -368,14 +336,13 @@ function AppShell(): React.JSX.Element {
 
   const handleSaveBankDetails = (details: BankDetails): void => {
     setBankDetails(details);
-    setSnackbarMessage('Bank & UPI details saved.');
+    setSnackbarMessage('Payment details saved.');
   };
 
-  const hasScreenHeader =
+  const hasOwnHeader =
     (!sidebarScreen && Boolean(selectedMarket && selectedGame)) ||
-    (sidebarScreen === 'gameChart' && selectedChart !== null) ||
-    (!sidebarScreen && !selectedMarket && activeTab === 'wallet' &&
-      walletSubView !== 'menu');
+    (sidebarScreen === 'gameChart' && selectedChart !== null);
+  const isHome = !sidebarScreen && !selectedMarket && activeTab === 'home';
 
   const renderSidebarScreen = (): React.ReactNode => {
     switch (sidebarScreen) {
@@ -389,32 +356,10 @@ function AppShell(): React.JSX.Element {
             }}
           />
         );
-      case 'withdrawHistory':
-        return (
-          <TransactionsListScreen
-            mode="withdraw_only"
-            transactions={transactions}
-          />
-        );
       case 'notice':
         return <NoticeScreen />;
       case 'gameRates':
         return <GameRatesScreen />;
-      case 'withdrawRequest':
-        return (
-          <WithdrawFundScreen
-            balanceRupees={balanceRupees}
-            profile={profile}
-            onSubmitWithdraw={amount => {
-              handleWithdrawFund(amount);
-              setSidebarScreen(null);
-            }}
-          />
-        );
-      case 'transaction':
-        return (
-          <TransactionsListScreen mode="all" transactions={transactions} />
-        );
       case 'gameTiming':
         return <GameTimingScreen markets={INITIAL_MARKETS} />;
       case 'gameChart':
@@ -439,127 +384,124 @@ function AppShell(): React.JSX.Element {
     }
   };
 
+  const renderBidsScreen = (): React.ReactNode => {
+    switch (bidsSubView) {
+      case 'bidHistory':
+        return <BidHistoryScreen bids={bids} />;
+      case 'gameResults':
+        return (
+          <GameResultScreen
+            markets={INITIAL_MARKETS}
+            onSelectMarket={market => setChartMarket(market)}
+          />
+        );
+      default:
+        return (
+          <MyBidsScreen
+            onSelect={setBidsSubView}
+            onUnavailable={title => setSnackbarMessage(`${title} is coming soon.`)}
+          />
+        );
+    }
+  };
+
+  const renderScreen = (): React.ReactNode => {
+    if (sidebarScreen) {
+      return renderSidebarScreen();
+    }
+    if (selectedMarket && selectedGame) {
+      return (
+        <PlayGameScreen
+          market={selectedMarket}
+          game={selectedGame}
+          balanceRupees={balanceRupees}
+          onBack={() => setSelectedGame(null)}
+          onPlaceBets={handlePlaceBets}
+        />
+      );
+    }
+    if (selectedMarket) {
+      return (
+        <MarketGamesScreen
+          market={selectedMarket}
+          onSelectGame={game => setSelectedGame(game)}
+        />
+      );
+    }
+    switch (activeTab) {
+      case 'home':
+        return (
+          <HomeScreen
+            markets={INITIAL_MARKETS}
+            onPlaceBet={market => setSelectedMarket(market)}
+            onOpenChart={market => setChartMarket(market)}
+            onOpenRates={() => setSidebarScreen('gameRates')}
+            onAddFunds={() => openFunds('addFund')}
+            onWithdraw={() => openFunds('withdraw')}
+            onInvite={() => {
+              handleShareApp();
+            }}
+            onWhatsAppPress={() => {
+              handleOpenWhatsApp();
+            }}
+            onTelegramPress={() => {
+              handleJoinTelegram();
+            }}
+          />
+        );
+      case 'history':
+        return <PassbookScreen transactions={transactions} />;
+      case 'allBids':
+        return renderBidsScreen();
+      default:
+        return (
+          <FundsScreen
+            profile={profile}
+            balanceRupees={balanceRupees}
+            transactions={transactions}
+            bankDetails={bankDetails}
+            subView={fundsSubView}
+            onSubViewChange={setFundsSubView}
+            onAddFund={handleAddFund}
+            onWithdrawFund={handleWithdrawFund}
+            onSaveBankDetails={handleSaveBankDetails}
+            onSupportPress={() => {
+              handleOpenWhatsApp();
+            }}
+          />
+        );
+    }
+  };
+
   return (
     <View
       style={[
         styles.root,
         { paddingTop: insets.top, paddingBottom: insets.bottom },
       ]}>
-      {!hasScreenHeader && (
-        <>
-          <NoticeTicker />
-          <TopAppBar
-            title={currentTitle}
-            isBrandHeader={
-              !sidebarScreen && (activeTab === 'home' || Boolean(selectedMarket))
-            }
+      {!hasOwnHeader &&
+        (isHome ? (
+          <HomeHeader
             balanceRupees={balanceRupees}
             onMenuPress={() => setDrawerOpen(true)}
-            onBackPress={
-              sidebarScreen
-                ? () => setSidebarScreen(null)
-                : selectedMarket
-                ? () => setSelectedMarket(null)
-                : undefined
-            }
-            onWalletPress={() => {
-              setSidebarScreen(null);
-              setSelectedGame(null);
-              setSelectedMarket(null);
-              setWalletSubView('menu');
-              setSelectedChart(null);
-              setActiveTab('wallet');
-            }}
+            onWalletPress={() => openFunds('menu')}
+            onRefreshPress={() => setSnackbarMessage('Balance refreshed.')}
           />
-        </>
-      )}
-
-      <View style={styles.screenArea}>
-        {sidebarScreen ? (
-          renderSidebarScreen()
-        ) : selectedMarket && selectedGame ? (
-          <PlayGameScreen
-            market={selectedMarket}
-            game={selectedGame}
-            balanceRupees={balanceRupees}
-            onBack={() => setSelectedGame(null)}
-            onPlaceBets={handlePlaceBets}
-          />
-        ) : selectedMarket ? (
-          <MarketGamesScreen
-            market={selectedMarket}
-            onSelectGame={game => setSelectedGame(game)}
-          />
-        ) : activeTab === 'home' ? (
-          <HomeScreen
-            markets={INITIAL_MARKETS}
-            onPlaceBet={market => setSelectedMarket(market)}
-            onOpenChart={market => setChartMarket(market)}
-            onOpenRates={() => setSidebarScreen('gameRates')}
-          />
-        ) : activeTab === 'history' ? (
-          <GameResultScreen
-            markets={INITIAL_MARKETS}
-            onSelectMarket={market => setChartMarket(market)}
-          />
-        ) : activeTab === 'allBids' ? (
-          <BidHistoryScreen bids={bids} />
         ) : (
-          <WalletScreen
+          <ScreenHeader
+            title={currentTitle}
             balanceRupees={balanceRupees}
-            transactions={transactions}
-            bankDetails={bankDetails}
-            subView={walletSubView}
-            onSubViewChange={setWalletSubView}
-            onAddFund={handleAddFund}
-            onWithdrawFund={handleWithdrawFund}
-            onSaveBankDetails={handleSaveBankDetails}
+            onBackPress={() => {
+              handleBack();
+            }}
+            onWalletPress={() => openFunds('menu')}
           />
-        )}
-      </View>
+        ))}
+
+      <View style={styles.screenArea}>{renderScreen()}</View>
 
       {!sidebarScreen && !selectedGame && (
-        <BottomNavigation.Bar
-          navigationState={{ index: tabIndex, routes: BOTTOM_ROUTES }}
-          onTabPress={({ route, preventDefault }) =>
-            handleTabPress(route.key as TabKey, preventDefault)
-          }
-          renderIcon={({ route, focused, color }) => {
-            const navRoute = route as NavRoute;
-            const iconName = focused
-              ? navRoute.focusedIcon
-              : navRoute.unfocusedIcon;
-
-            if (navRoute.key === 'home') {
-              return (
-                <Surface
-                  style={[
-                    styles.homeNavBadge,
-                    focused
-                      ? styles.homeNavBadgeActive
-                      : styles.homeNavBadgeInactive,
-                  ]}
-                  elevation={3}>
-                  <Icon
-                    source={iconName}
-                    size={22}
-                    color={
-                      focused
-                        ? APP_COLORS.primaryBackground
-                        : APP_COLORS.accent
-                    }
-                  />
-                </Surface>
-              );
-            }
-
-            return <Icon source={iconName} size={22} color={color} />;
-          }}
-          style={styles.bottomBar}
-          activeColor={APP_COLORS.accent}
-          inactiveColor={APP_COLORS.textSecondary}
-          activeIndicatorStyle={styles.activeIndicator}
-        />
+        <BottomTabBar activeTab={activeTab} onTabPress={handleTabPress} />
       )}
 
       <AppDrawerModal
@@ -567,17 +509,12 @@ function AppShell(): React.JSX.Element {
         onDismiss={() => setDrawerOpen(false)}
         profile={profile}
         onOpenScreen={screen => {
-          setSelectedGame(null);
-          setSelectedMarket(null);
-          setWalletSubView('menu');
-          setSelectedChart(null);
+          resetNavigation();
           setSidebarScreen(screen);
         }}
+        onTabPress={handleTabPress}
         onShareApp={() => {
           handleShareApp();
-        }}
-        onJoinTelegram={() => {
-          handleJoinTelegram();
         }}
         onLogoutPress={() => setLogoutDialogOpen(true)}
       />
@@ -612,12 +549,10 @@ function AppShell(): React.JSX.Element {
             <Button
               mode="contained"
               buttonColor={APP_COLORS.danger}
-              textColor={APP_COLORS.textPrimary}
+              textColor={APP_COLORS.white}
               onPress={() => {
                 setLogoutDialogOpen(false);
-                setSidebarScreen(null);
-                setSelectedGame(null);
-                setSelectedMarket(null);
+                resetNavigation();
                 setActiveTab('home');
                 setSnackbarMessage('Logged out successfully.');
               }}>
@@ -642,7 +577,7 @@ function App(): React.JSX.Element {
   return (
     <SafeAreaProvider>
       <PaperProvider theme={royalMatkaTheme}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar barStyle="dark-content" />
         <AppShell />
       </PaperProvider>
     </SafeAreaProvider>
@@ -657,31 +592,6 @@ const styles = StyleSheet.create({
   screenArea: {
     flex: 1,
   },
-  bottomBar: {
-    backgroundColor: APP_COLORS.secondary,
-    borderTopWidth: 1,
-    borderTopColor: APP_COLORS.border,
-  },
-  activeIndicator: {
-    backgroundColor: APP_COLORS.accentMuted,
-  },
-  homeNavBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -10,
-    borderWidth: 2,
-  },
-  homeNavBadgeActive: {
-    backgroundColor: APP_COLORS.accent,
-    borderColor: APP_COLORS.primaryBackground,
-  },
-  homeNavBadgeInactive: {
-    backgroundColor: APP_COLORS.secondaryElevated,
-    borderColor: APP_COLORS.accent,
-  },
   dialog: {
     backgroundColor: APP_COLORS.secondary,
     borderRadius: 16,
@@ -694,7 +604,7 @@ const styles = StyleSheet.create({
     color: APP_COLORS.textSecondary,
   },
   snackbar: {
-    backgroundColor: APP_COLORS.secondaryElevated,
+    backgroundColor: APP_COLORS.dark,
   },
 });
 

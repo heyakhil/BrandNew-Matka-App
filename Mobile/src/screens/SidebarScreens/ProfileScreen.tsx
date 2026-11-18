@@ -112,7 +112,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             mode="contained"
             onPress={handleSave}
             buttonColor={APP_COLORS.accent}
-            textColor={APP_COLORS.primaryBackground}
+            textColor={APP_COLORS.onAccent}
             style={styles.saveBtn}
             labelStyle={styles.saveLabel}>
             Save Profile

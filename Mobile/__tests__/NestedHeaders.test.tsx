@@ -1,23 +1,21 @@
 import React from 'react';
 import { BackHandler } from 'react-native';
-import { BottomNavigation, IconButton } from 'react-native-paper';
 import ReactTestRenderer from 'react-test-renderer';
 import App from '../App';
-import { NoticeTicker } from '../src/components/molecules/NoticeTicker';
-import { TopAppBar } from '../src/components/molecules/TopAppBar';
+import { HomeHeader } from '../src/components/molecules/HomeHeader';
+import { ScreenHeader } from '../src/components/molecules/ScreenHeader';
 import { AppDrawerModal } from '../src/components/organisms/AppDrawerModal';
+import { BottomTabBar } from '../src/components/organisms/BottomTabBar';
 import { INITIAL_MARKETS } from '../src/data/mockData';
+import { FundsScreen } from '../src/screens/FundsScreen';
 import { GameChartScreen } from '../src/screens/SidebarScreens/GameChartScreen';
-import { WalletScreen } from '../src/screens/WalletScreen';
 
 jest.mock('react-native-safe-area-context', () =>
   jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
-jest.mock('../src/components/molecules/TopAppBar', () => ({
-  TopAppBar: jest.fn(() => null),
-}));
+jest.mock('react-native-linear-gradient', () => 'LinearGradient');
 
-describe('nested screen headers', () => {
+describe('app navigation headers', () => {
   let renderer: ReactTestRenderer.ReactTestRenderer;
   let hardwareBack: (() => boolean | null | undefined) | undefined;
 
@@ -37,95 +35,53 @@ describe('nested screen headers', () => {
     hardwareBack = undefined;
   });
 
-  const expectParentHeader = (visible: boolean): void => {
-    expect(renderer.root.findAllByType(TopAppBar)).toHaveLength(visible ? 1 : 0);
-    expect(renderer.root.findAllByType(NoticeTicker)).toHaveLength(visible ? 1 : 0);
-  };
-
-  const openWallet = async (): Promise<void> => {
+  const pressTab = async (key: 'home' | 'wallet'): Promise<void> => {
     await ReactTestRenderer.act(() => {
-      const bar = renderer.root.findByType(BottomNavigation.Bar);
-      bar.props.onTabPress({
-        route: { key: 'wallet' },
-        preventDefault: jest.fn(),
-      });
+      renderer.root.findByType(BottomTabBar).props.onTabPress(key);
     });
   };
 
-  test.each(['history', 'addHistory', 'bank'] as const)(
-    'hides the parent header in wallet %s and restores it on back',
-    async subView => {
-      await openWallet();
-      expectParentHeader(true);
+  test('shows the home header only on the home tab', async () => {
+    expect(renderer.root.findAllByType(HomeHeader)).toHaveLength(1);
+    await pressTab('wallet');
+    expect(renderer.root.findAllByType(HomeHeader)).toHaveLength(0);
+    expect(renderer.root.findAllByType(ScreenHeader)).toHaveLength(1);
+  });
 
-      await ReactTestRenderer.act(() => {
-        renderer.root.findByType(WalletScreen).props.onSubViewChange(subView);
-      });
-      expectParentHeader(false);
-
-      await ReactTestRenderer.act(() => {
-        renderer.root
-          .findByType(WalletScreen)
-          .findAllByType(IconButton)
-          .find(button => button.props.icon === 'arrow-left')
-          ?.props.onPress();
-      });
-      expect(renderer.root.findByType(WalletScreen).props.subView).toBe('menu');
-      expectParentHeader(true);
-    },
-  );
-
-  test('hardware back closes a wallet subview before leaving the wallet', async () => {
-    await openWallet();
+  test('hardware back closes a funds subview before leaving the tab', async () => {
+    await pressTab('wallet');
     await ReactTestRenderer.act(() => {
-      renderer.root.findByType(WalletScreen).props.onSubViewChange('history');
+      renderer.root.findByType(FundsScreen).props.onSubViewChange('addFund');
     });
     await ReactTestRenderer.act(() => {
       expect(hardwareBack?.()).toBe(true);
     });
-    expect(renderer.root.findByType(WalletScreen).props.subView).toBe('menu');
-    expectParentHeader(true);
+    expect(renderer.root.findByType(FundsScreen).props.subView).toBe('menu');
   });
 
-  test('leaving the wallet resets its subview without resetting it on a same-tab press', async () => {
-    await openWallet();
+  test('leaving funds resets its subview', async () => {
+    await pressTab('wallet');
     await ReactTestRenderer.act(() => {
-      renderer.root.findByType(WalletScreen).props.onSubViewChange('bank');
+      renderer.root.findByType(FundsScreen).props.onSubViewChange('bank');
     });
-    await openWallet();
-    expect(renderer.root.findByType(WalletScreen).props.subView).toBe('bank');
-    expectParentHeader(false);
-
-    await ReactTestRenderer.act(() => {
-      renderer.root.findByType(BottomNavigation.Bar).props.onTabPress({
-        route: { key: 'home' },
-        preventDefault: jest.fn(),
-      });
-    });
-    expectParentHeader(true);
-    await openWallet();
-    expect(renderer.root.findByType(WalletScreen).props.subView).toBe('menu');
-    expectParentHeader(true);
+    await pressTab('home');
+    await pressTab('wallet');
+    expect(renderer.root.findByType(FundsScreen).props.subView).toBe('menu');
   });
 
-  test('chart detail hides the parent header and hardware back restores the chart list', async () => {
+  test('hardware back restores the chart list from chart detail', async () => {
     await ReactTestRenderer.act(() => {
       renderer.root.findByType(AppDrawerModal).props.onOpenScreen('gameChart');
     });
-    expectParentHeader(true);
-
     await ReactTestRenderer.act(() => {
       renderer.root.findByType(GameChartScreen).props.onSelectChart({
         market: INITIAL_MARKETS[0],
         mode: 'Jodi',
       });
     });
-    expectParentHeader(false);
-
     await ReactTestRenderer.act(() => {
       expect(hardwareBack?.()).toBe(true);
     });
     expect(renderer.root.findByType(GameChartScreen).props.selectedChart).toBeNull();
-    expectParentHeader(true);
   });
 });

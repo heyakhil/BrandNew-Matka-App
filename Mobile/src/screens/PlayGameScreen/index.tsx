@@ -303,7 +303,7 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                       }
                       textColor={
                         oddEvenChoice === 'ODD'
-                          ? APP_COLORS.primaryBackground
+                          ? APP_COLORS.onAccent
                           : APP_COLORS.textPrimary
                       }
                       style={styles.oddEvenBtn}>
@@ -319,7 +319,7 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                       }
                       textColor={
                         oddEvenChoice === 'EVEN'
-                          ? APP_COLORS.primaryBackground
+                          ? APP_COLORS.onAccent
                           : APP_COLORS.textPrimary
                       }
                       style={styles.oddEvenBtn}>
@@ -372,7 +372,8 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
 
                 <TextInput
                   mode="outlined"
-                  label="Points / Amount (₹5 – ₹10,000)"
+                  label="Points / Amount"
+                  placeholder="₹5 – ₹10,000"
                   value={stakeText}
                   onChangeText={val => {
                     setStakeText(val.replace(/\D/g, ''));
@@ -389,7 +390,7 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                   mode="contained"
                   onPress={handleAddSingleBid}
                   buttonColor={APP_COLORS.accent}
-                  textColor={APP_COLORS.primaryBackground}
+                  textColor={APP_COLORS.onAccent}
                   style={styles.addBtn}>
                   Add Bid
                 </Button>
@@ -455,7 +456,7 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
           }
           textColor={
             totalBidsCount > 0
-              ? APP_COLORS.primaryBackground
+              ? APP_COLORS.onAccent
               : APP_COLORS.textSecondary
           }
           style={styles.placeBetBtn}

@@ -65,14 +65,13 @@ export const NoticeTicker: React.FC<NoticeTickerProps> = ({
 
 const styles = StyleSheet.create({
   bar: {
-    backgroundColor: '#161E2E',
-    borderBottomWidth: 1,
-    borderBottomColor: APP_COLORS.border,
+    backgroundColor: APP_COLORS.dark,
     paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingVertical: 10,
   },
   text: {
-    color: APP_COLORS.textSecondary,
+    color: APP_COLORS.white,
+    fontSize: 14,
     fontWeight: '500',
   },
 });

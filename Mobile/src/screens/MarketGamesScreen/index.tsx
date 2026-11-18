@@ -18,11 +18,6 @@ export const MarketGamesScreen: React.FC<MarketGamesScreenProps> = ({
   const isCloseOnly = market.status === 'close_running';
 
   const visibleGames = useMemo(() => {
-    if (market.category === 'starline') {
-      return MARKET_GAME_OPTIONS.filter(g =>
-        ['SD', 'SDB', 'SP', 'SPB', 'DP', 'DPB', 'TP'].includes(g.id),
-      );
-    }
     if (market.category === 'jackpot') {
       return MARKET_GAME_OPTIONS.filter(g => ['JD', 'JDB', 'RB'].includes(g.id));
     }

@@ -94,7 +94,7 @@ export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({
         mode="contained"
         onPress={handleSubmit}
         buttonColor={APP_COLORS.accent}
-        textColor={APP_COLORS.primaryBackground}
+        textColor={APP_COLORS.onAccent}
         style={styles.submitBtn}
         labelStyle={styles.submitLabel}>
         Change Password

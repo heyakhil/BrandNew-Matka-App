@@ -43,7 +43,7 @@ export const BidHistoryScreen: React.FC<BidHistoryScreenProps> = ({ bids }) => {
             mode="contained"
             size={20}
             containerColor={APP_COLORS.accent}
-            iconColor={APP_COLORS.primaryBackground}
+            iconColor={APP_COLORS.onAccent}
             onPress={() => handleCycleDate(1)}
             accessibilityLabel="Switch date filter"
           />

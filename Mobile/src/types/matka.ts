@@ -2,14 +2,22 @@ export type TabKey = 'history' | 'allBids' | 'home' | 'wallet' | 'chat';
 
 export type SidebarScreenKey =
   | 'profile'
-  | 'withdrawHistory'
   | 'notice'
   | 'gameRates'
-  | 'withdrawRequest'
-  | 'transaction'
   | 'gameTiming'
   | 'gameChart'
   | 'changePassword';
+
+export type MyBidsSubView = 'menu' | 'bidHistory' | 'gameResults';
+
+export type FundsSubView =
+  | 'menu'
+  | 'addFund'
+  | 'withdraw'
+  | 'bank'
+  | 'upi'
+  | 'depositHistory'
+  | 'withdrawHistory';
 
 export interface UserProfile {
   name: string;
@@ -17,7 +25,7 @@ export interface UserProfile {
   email: string;
 }
 
-export type MarketCategory = 'main' | 'starline' | 'jackpot';
+export type MarketCategory = 'main' | 'jackpot';
 
 export type MarketStatus = 'open_running' | 'close_running' | 'closed';
 

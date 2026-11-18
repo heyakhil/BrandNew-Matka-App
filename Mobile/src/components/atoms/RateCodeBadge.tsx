@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   label: {
-    color: APP_COLORS.textPrimary,
+    color: APP_COLORS.white,
     fontWeight: '800',
     letterSpacing: 0.6,
   },

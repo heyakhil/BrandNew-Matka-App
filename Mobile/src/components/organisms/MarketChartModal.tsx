@@ -83,7 +83,7 @@ export const MarketChartModal: React.FC<MarketChartModalProps> = ({
                 onPlaceBet(market);
               }}
               buttonColor={APP_COLORS.accent}
-              textColor={APP_COLORS.primaryBackground}
+              textColor={APP_COLORS.onAccent}
               labelStyle={styles.btnLabel}>
               {market.status === 'closed' ? 'Market Closed' : 'Place Bet'}
             </Button>

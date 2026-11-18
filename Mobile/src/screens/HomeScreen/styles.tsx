@@ -7,13 +7,9 @@ export const styles = StyleSheet.create({
     backgroundColor: APP_COLORS.primaryBackground,
   },
   listContent: {
-    paddingHorizontal: 14,
-    paddingTop: 12,
     paddingBottom: 24,
   },
-  sectionTitle: {
-    color: APP_COLORS.textPrimary,
-    fontWeight: '800',
-    marginBottom: 10,
+  cards: {
+    paddingHorizontal: 12,
   },
 });

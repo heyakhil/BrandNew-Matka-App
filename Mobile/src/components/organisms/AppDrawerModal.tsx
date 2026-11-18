@@ -1,26 +1,27 @@
 import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import {
-  Avatar,
-  Divider,
   Icon,
-  IconButton,
   Modal,
   Portal,
-  Surface,
   Text,
   TouchableRipple,
 } from 'react-native-paper';
 import { APP_COLORS } from '../../theme/paperTheme';
-import type { SidebarScreenKey, UserProfile } from '../../types/matka';
+import type {
+  SidebarScreenKey,
+  TabKey,
+  UserProfile,
+} from '../../types/matka';
 
 interface AppDrawerModalProps {
   visible: boolean;
   onDismiss: () => void;
   profile: UserProfile;
   onOpenScreen: (screen: SidebarScreenKey) => void;
+  onTabPress: (tab: TabKey) => void;
   onShareApp: () => void;
-  onJoinTelegram: () => void;
   onLogoutPress: () => void;
 }
 
@@ -31,93 +32,38 @@ interface SidebarOption {
   action: () => void;
 }
 
+const DRAWER_GRADIENT: string[] = [APP_COLORS.primaryBackground, '#EFEFEF'];
+
 export const AppDrawerModal: React.FC<AppDrawerModalProps> = ({
   visible,
   onDismiss,
   profile,
   onOpenScreen,
+  onTabPress,
   onShareApp,
-  onJoinTelegram,
   onLogoutPress,
 }) => {
-  const openAndClose = (cb: () => void): void => {
-    onDismiss();
-    cb();
+  const openAndClose = (cb: () => void): (() => void) => {
+    return () => {
+      onDismiss();
+      cb();
+    };
   };
 
   const options: SidebarOption[] = [
-    {
-      id: 'profile',
-      label: 'Profile',
-      icon: 'account',
-      action: () => openAndClose(() => onOpenScreen('profile')),
-    },
-    {
-      id: 'withdrawHistory',
-      label: 'Withdraw History',
-      icon: 'cash-clock',
-      action: () => openAndClose(() => onOpenScreen('withdrawHistory')),
-    },
-    {
-      id: 'notice',
-      label: 'Notice',
-      icon: 'clipboard-text-outline',
-      action: () => openAndClose(() => onOpenScreen('notice')),
-    },
-    {
-      id: 'gameRates',
-      label: 'Game Rate',
-      icon: 'gamepad-variant-outline',
-      action: () => openAndClose(() => onOpenScreen('gameRates')),
-    },
-    {
-      id: 'withdrawRequest',
-      label: 'Withdraw Request',
-      icon: 'bank-transfer-out',
-      action: () => openAndClose(() => onOpenScreen('withdrawRequest')),
-    },
-    {
-      id: 'transaction',
-      label: 'Transaction',
-      icon: 'swap-horizontal-circle-outline',
-      action: () => openAndClose(() => onOpenScreen('transaction')),
-    },
-    {
-      id: 'gameTiming',
-      label: 'Game Timing',
-      icon: 'clock-outline',
-      action: () => openAndClose(() => onOpenScreen('gameTiming')),
-    },
-    {
-      id: 'gameChart',
-      label: 'Game Chart',
-      icon: 'table-large',
-      action: () => openAndClose(() => onOpenScreen('gameChart')),
-    },
-    {
-      id: 'changePassword',
-      label: 'Change Password',
-      icon: 'key-variant',
-      action: () => openAndClose(() => onOpenScreen('changePassword')),
-    },
-    {
-      id: 'share',
-      label: 'Share',
-      icon: 'share-variant',
-      action: () => openAndClose(onShareApp),
-    },
-    {
-      id: 'telegram',
-      label: 'Join Telegram',
-      icon: 'send',
-      action: () => openAndClose(onJoinTelegram),
-    },
-    {
-      id: 'logout',
-      label: 'Logout',
-      icon: 'logout',
-      action: () => openAndClose(onLogoutPress),
-    },
+    { id: 'home', label: 'Home', icon: 'home-outline', action: openAndClose(() => onTabPress('home')) },
+    { id: 'bids', label: 'My Bids', icon: 'gavel', action: openAndClose(() => onTabPress('allBids')) },
+    { id: 'passbook', label: 'Passbook', icon: 'credit-card-outline', action: openAndClose(() => onTabPress('history')) },
+    { id: 'chat', label: 'Chat', icon: 'chat-outline', action: openAndClose(() => onTabPress('chat')) },
+    { id: 'funds', label: 'Funds', icon: 'bank-outline', action: openAndClose(() => onTabPress('wallet')) },
+    { id: 'notice', label: 'Notice Board / Rules', icon: 'alert-outline', action: openAndClose(() => onOpenScreen('notice')) },
+    { id: 'rates', label: 'Game Rates', icon: 'star-four-points-outline', action: openAndClose(() => onOpenScreen('gameRates')) },
+    { id: 'timing', label: 'Game Timing', icon: 'clock-outline', action: openAndClose(() => onOpenScreen('gameTiming')) },
+    { id: 'charts', label: 'Charts', icon: 'chart-timeline-variant', action: openAndClose(() => onOpenScreen('gameChart')) },
+    { id: 'password', label: 'Change Password', icon: 'lock-outline', action: openAndClose(() => onOpenScreen('changePassword')) },
+    { id: 'invite', label: 'Invite And Earn', icon: 'star-four-points-outline', action: openAndClose(onShareApp) },
+    { id: 'share', label: 'Share Application', icon: 'share-outline', action: openAndClose(onShareApp) },
+    { id: 'logout', label: 'Logout', icon: 'power', action: openAndClose(onLogoutPress) },
   ];
 
   return (
@@ -126,69 +72,36 @@ export const AppDrawerModal: React.FC<AppDrawerModalProps> = ({
         visible={visible}
         onDismiss={onDismiss}
         contentContainerStyle={styles.modalContainer}>
-        <Surface style={styles.drawerSurface} elevation={4}>
-          <View style={styles.profileHeader}>
-            <View style={styles.profileLeft}>
-              <Text variant="titleLarge" style={styles.greeting}>
-                Hello,
-              </Text>
-              <Text variant="titleMedium" style={styles.userName}>
-                {profile.name}
-              </Text>
-              <View style={styles.phoneRow}>
-                <Icon
-                  source="cellphone"
-                  size={15}
-                  color={APP_COLORS.accent}
-                />
-                <Text variant="labelLarge" style={styles.pipeSep}>
-                  |
+        <LinearGradient colors={DRAWER_GRADIENT} style={styles.drawer}>
+          <TouchableRipple
+            onPress={openAndClose(() => onOpenScreen('profile'))}
+            style={styles.profileCard}>
+            <View style={styles.profileContent}>
+              <View style={styles.avatar}>
+                <Icon source="account-outline" size={52} color={APP_COLORS.textPrimary} />
+              </View>
+              <View style={styles.profileText}>
+                <Text style={styles.userName} numberOfLines={1}>
+                  {profile.name}
                 </Text>
-                <Text variant="bodySmall" style={styles.phoneText}>
-                  {profile.phone}
-                </Text>
+                <Text style={styles.phone}>{profile.phone}</Text>
               </View>
             </View>
+          </TouchableRipple>
 
-            <IconButton
-              icon="close"
-              mode="contained"
-              size={18}
-              containerColor={APP_COLORS.primaryBackground}
-              iconColor={APP_COLORS.textPrimary}
-              onPress={onDismiss}
-              style={styles.closeBtn}
-            />
-          </View>
-
-          <Divider style={styles.divider} />
+          <View style={styles.divider} />
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            {options.map((opt, idx) => (
-              <React.Fragment key={opt.id}>
-                <TouchableRipple onPress={opt.action} style={styles.rowTouch}>
-                  <View style={styles.rowContent}>
-                    <Avatar.Icon
-                      size={32}
-                      icon={opt.icon}
-                      color={APP_COLORS.primaryBackground}
-                      style={styles.iconCircle}
-                    />
-                    <Text variant="bodyMedium" style={styles.rowPipe}>
-                      |
-                    </Text>
-                    <Text variant="bodyLarge" style={styles.rowLabel}>
-                      {opt.label}
-                    </Text>
-                  </View>
-                </TouchableRipple>
-                {idx < options.length - 1 && (
-                  <Divider style={styles.rowDivider} />
-                )}
-              </React.Fragment>
+            {options.map(opt => (
+              <TouchableRipple key={opt.id} onPress={opt.action} style={styles.row}>
+                <View style={styles.rowContent}>
+                  <Icon source={opt.icon} size={28} color={APP_COLORS.textPrimary} />
+                  <Text style={styles.rowLabel}>{opt.label}</Text>
+                </View>
+              </TouchableRipple>
             ))}
           </ScrollView>
-        </Surface>
+        </LinearGradient>
       </Modal>
     </Portal>
   );
@@ -197,79 +110,67 @@ export const AppDrawerModal: React.FC<AppDrawerModalProps> = ({
 const styles = StyleSheet.create({
   modalContainer: {
     margin: 0,
-    width: '78%',
-    maxWidth: 310,
+    width: '72%',
+    maxWidth: 300,
     height: '100%',
     justifyContent: 'flex-start',
   },
-  drawerSurface: {
+  drawer: {
     flex: 1,
-    backgroundColor: APP_COLORS.secondary,
-    borderRightWidth: 1,
-    borderRightColor: APP_COLORS.border,
-    paddingTop: 18,
+    paddingTop: 36,
   },
-  profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingBottom: 14,
+  profileCard: {
+    marginHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: APP_COLORS.white,
+    elevation: 4,
   },
-  profileLeft: {
-    flex: 1,
-  },
-  greeting: {
-    color: APP_COLORS.textPrimary,
-    fontWeight: '800',
-  },
-  userName: {
-    color: APP_COLORS.accent,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  phoneRow: {
+  profileContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 8,
+    padding: 14,
+    gap: 14,
   },
-  pipeSep: {
-    color: APP_COLORS.textSecondary,
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
+    borderColor: APP_COLORS.primaryBackground,
+    backgroundColor: '#F6F6F6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  phoneText: {
+  profileText: {
+    flex: 1,
+  },
+  userName: {
     color: APP_COLORS.textPrimary,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '800',
   },
-  closeBtn: {
-    margin: 0,
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
+  phone: {
+    color: APP_COLORS.textSecondary,
+    fontSize: 14,
+    marginTop: 2,
   },
   divider: {
-    backgroundColor: APP_COLORS.border,
+    height: 1,
+    marginHorizontal: 14,
+    marginVertical: 16,
+    backgroundColor: 'rgba(255,255,255,0.6)',
   },
-  rowTouch: {
+  row: {
     paddingHorizontal: 16,
-    paddingVertical: 11,
+    paddingVertical: 10,
   },
   rowContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  iconCircle: {
-    backgroundColor: APP_COLORS.accent,
-  },
-  rowPipe: {
-    color: APP_COLORS.textSecondary,
+    gap: 18,
   },
   rowLabel: {
-    color: APP_COLORS.textPrimary,
-    fontWeight: '600',
-  },
-  rowDivider: {
-    backgroundColor: APP_COLORS.border,
-    opacity: 0.6,
+    color: APP_COLORS.textSecondary,
+    fontSize: 15,
   },
 });

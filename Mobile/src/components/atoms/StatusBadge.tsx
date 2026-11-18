@@ -8,24 +8,21 @@ interface StatusBadgeProps {
   status: MarketStatus;
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
-  const config =
-    status === 'open_running'
-      ? { label: 'Betting Is Running Now', color: APP_COLORS.success }
-      : status === 'close_running'
-      ? { label: 'Betting Is Running For Close', color: APP_COLORS.accent }
-      : { label: 'Betting Closed For Today', color: APP_COLORS.danger };
+const STATUS_CONFIG: Record<MarketStatus, { label: string; color: string }> = {
+  open_running: { label: 'Running now', color: APP_COLORS.success },
+  close_running: { label: 'Running for close', color: APP_COLORS.accent },
+  closed: { label: 'Closed for Today', color: APP_COLORS.danger },
+};
 
-  return (
-    <Text variant="labelMedium" style={[styles.text, { color: config.color }]}>
-      {config.label}
-    </Text>
-  );
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
+  const { label, color } = STATUS_CONFIG[status];
+
+  return <Text style={[styles.text, { color }]}>{label}</Text>;
 };
 
 const styles = StyleSheet.create({
   text: {
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
