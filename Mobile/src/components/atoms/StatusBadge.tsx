@@ -17,12 +17,17 @@ const STATUS_CONFIG: Record<MarketStatus, { label: string; color: string }> = {
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   const { label, color } = STATUS_CONFIG[status];
 
-  return <Text style={[styles.text, { color }]}>{label}</Text>;
+  return (
+    <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.text, { color }]}>
+      {label}
+    </Text>
+  );
 };
 
 const styles = StyleSheet.create({
   text: {
-    fontSize: 12,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: '700',
   },
 });

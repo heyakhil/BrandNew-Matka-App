@@ -28,7 +28,7 @@ export const PassbookRow: React.FC<PassbookRowProps> = ({ transaction }) => {
           <Text style={[styles.text, styles.particulars]}>{title}</Text>
           <Icon
             source={expanded ? 'chevron-up' : 'chevron-down'}
-            size={26}
+            size={22}
             color={APP_COLORS.accent}
           />
         </View>
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    minHeight: 76,
+    minHeight: 64,
   },
   dateCol: {
     width: '30%',
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   },
   text: {
     color: APP_COLORS.textPrimary,
-    fontSize: 15,
+    fontSize: 14,
     textAlign: 'center',
   },
   details: {

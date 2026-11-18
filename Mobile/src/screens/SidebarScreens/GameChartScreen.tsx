@@ -146,7 +146,7 @@ export const GameChartScreen: React.FC<GameChartScreenProps> = ({
                   mode="contained"
                   compact
                   buttonColor={APP_COLORS.danger}
-                  textColor={APP_COLORS.textPrimary}
+                  textColor={APP_COLORS.secondary}
                   onPress={() => setSelectedChart({ market: item, mode: 'Jodi' })}
                   style={styles.chartBtn}
                   labelStyle={styles.chartBtnLabel}>
@@ -156,7 +156,7 @@ export const GameChartScreen: React.FC<GameChartScreenProps> = ({
                   mode="contained"
                   compact
                   buttonColor={APP_COLORS.accent}
-                  textColor={APP_COLORS.onAccent}
+                  textColor={APP_COLORS.secondary}
                   onPress={() => setSelectedChart({ market: item, mode: 'Panel' })}
                   style={styles.chartBtn}
                   labelStyle={styles.chartBtnLabel}>

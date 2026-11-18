@@ -22,7 +22,7 @@ export const WalletInfoCard: React.FC<WalletInfoCardProps> = ({
       <Text style={styles.userText}>{phone}</Text>
     </View>
     <View style={styles.balanceRow}>
-      <Icon source="wallet-outline" size={84} color={APP_COLORS.primaryBackground} />
+      <Icon source="wallet-outline" size={64} color={APP_COLORS.primaryBackground} />
       <View style={styles.balanceText}>
         <Text style={styles.amount}>₹{balanceRupees}</Text>
         <Text style={styles.caption}>Current Balance</Text>
@@ -44,34 +44,37 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
   },
   spacer: {
-    height: 24,
+    height: 8,
   },
   userBand: {
     backgroundColor: APP_COLORS.dark,
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 10,
   },
   userText: {
     color: APP_COLORS.white,
-    fontSize: 18,
+    fontSize: 16,
+    lineHeight: 19,
     fontWeight: '700',
   },
   balanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 28,
-    paddingVertical: 28,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
   },
   balanceText: {
-    marginLeft: -24,
+    marginLeft: -16,
   },
   amount: {
     color: APP_COLORS.primaryBackground,
-    fontSize: 28,
+    fontSize: 24,
+    lineHeight: 28,
   },
   caption: {
     color: APP_COLORS.textPrimary,
-    fontSize: 18,
+    fontSize: 16,
+    lineHeight: 19,
   },
 });

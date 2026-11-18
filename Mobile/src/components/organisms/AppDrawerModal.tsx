@@ -78,7 +78,7 @@ export const AppDrawerModal: React.FC<AppDrawerModalProps> = ({
             style={styles.profileCard}>
             <View style={styles.profileContent}>
               <View style={styles.avatar}>
-                <Icon source="account-outline" size={52} color={APP_COLORS.textPrimary} />
+                <Icon source="account-outline" size={42} color={APP_COLORS.textPrimary} />
               </View>
               <View style={styles.profileText}>
                 <Text style={styles.userName} numberOfLines={1}>
@@ -95,7 +95,7 @@ export const AppDrawerModal: React.FC<AppDrawerModalProps> = ({
             {options.map(opt => (
               <TouchableRipple key={opt.id} onPress={opt.action} style={styles.row}>
                 <View style={styles.rowContent}>
-                  <Icon source={opt.icon} size={28} color={APP_COLORS.textPrimary} />
+                  <Icon source={opt.icon} size={24} color={APP_COLORS.textPrimary} />
                   <Text style={styles.rowLabel}>{opt.label}</Text>
                 </View>
               </TouchableRipple>
@@ -128,13 +128,13 @@ const styles = StyleSheet.create({
   profileContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    gap: 14,
+    padding: 12,
+    gap: 12,
   },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     borderWidth: 3,
     borderColor: APP_COLORS.primaryBackground,
     backgroundColor: '#F6F6F6',
@@ -146,31 +146,31 @@ const styles = StyleSheet.create({
   },
   userName: {
     color: APP_COLORS.textPrimary,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '800',
   },
   phone: {
     color: APP_COLORS.textSecondary,
-    fontSize: 14,
+    fontSize: 13,
     marginTop: 2,
   },
   divider: {
     height: 1,
     marginHorizontal: 14,
-    marginVertical: 16,
+    marginVertical: 12,
     backgroundColor: 'rgba(255,255,255,0.6)',
   },
   row: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 9,
   },
   rowContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 18,
+    gap: 14,
   },
   rowLabel: {
     color: APP_COLORS.textSecondary,
-    fontSize: 15,
+    fontSize: 14,
   },
 });

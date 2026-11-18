@@ -20,7 +20,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   <View style={styles.container}>
     <IconButton
       icon="chevron-left"
-      size={36}
+      size={30}
       iconColor={APP_COLORS.textPrimary}
       onPress={onBackPress}
       accessibilityLabel="Go back"
@@ -37,7 +37,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 64,
+    height: 58,
     paddingRight: 16,
     backgroundColor: APP_COLORS.primaryBackground,
   },
@@ -47,6 +47,7 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     color: APP_COLORS.textPrimary,
-    fontSize: 21,
+    fontSize: 18,
+    lineHeight: 22,
   },
 });

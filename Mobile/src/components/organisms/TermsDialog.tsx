@@ -27,12 +27,12 @@ export const TermsDialog: React.FC<TermsDialogProps> = ({
         <View style={styles.terms}>
           {WITHDRAW_TERMS.map(term => (
             <View key={term} style={styles.term}>
-              <Icon source="thumb-up" size={22} color="#F5B21F" />
+              <Icon source="thumb-up" size={19} color="#F5B21F" />
               <Text style={styles.termText}>{term}</Text>
             </View>
           ))}
         </View>
-        <GradientButton label="ACCEPT" onPress={onAccept} fontSize={16} />
+        <GradientButton label="ACCEPT" onPress={onAccept} fontSize={14} />
       </View>
     </View>
   </Modal>
@@ -48,17 +48,17 @@ const styles = StyleSheet.create({
   dialog: {
     backgroundColor: APP_COLORS.secondary,
     borderRadius: 16,
-    padding: 28,
+    padding: 22,
   },
   title: {
     color: APP_COLORS.textPrimary,
-    fontSize: 19,
+    fontSize: 17,
     fontWeight: '700',
     textAlign: 'center',
   },
   terms: {
     gap: 6,
-    marginVertical: 24,
+    marginVertical: 18,
   },
   term: {
     flexDirection: 'row',
@@ -68,6 +68,6 @@ const styles = StyleSheet.create({
   termText: {
     flex: 1,
     color: APP_COLORS.textPrimary,
-    fontSize: 17,
+    fontSize: 15,
   },
 });

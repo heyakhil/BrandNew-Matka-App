@@ -31,7 +31,7 @@ export const styles = StyleSheet.create({
     gap: 6,
   },
   listContent: {
-    padding: 14,
+    padding: 12,
     paddingBottom: 24,
   },
   emptyCard: {
@@ -43,19 +43,19 @@ export const styles = StyleSheet.create({
   },
   emptyContent: {
     alignItems: 'center',
-    paddingVertical: 44,
+    paddingVertical: 22,
     paddingHorizontal: 20,
   },
   searchBox: {
-    width: 64,
-    height: 64,
+    width: 56,
+    height: 56,
     borderRadius: 16,
     backgroundColor: APP_COLORS.primaryBackground,
     borderWidth: 1,
     borderColor: APP_COLORS.border,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   searchIconBg: {
     backgroundColor: 'transparent',

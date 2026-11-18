@@ -79,7 +79,7 @@ export const BidHistoryScreen: React.FC<BidHistoryScreenProps> = ({ bids }) => {
           <Card.Content style={styles.emptyContent}>
             <Surface style={styles.searchBox} elevation={0}>
               <Avatar.Icon
-                size={40}
+                size={34}
                 icon="magnify"
                 color={APP_COLORS.accent}
                 style={styles.searchIconBg}

@@ -67,11 +67,12 @@ const styles = StyleSheet.create({
   bar: {
     backgroundColor: APP_COLORS.dark,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 6,
   },
   text: {
     color: APP_COLORS.white,
-    fontSize: 14,
+    fontSize: 13,
+    lineHeight: 16,
     fontWeight: '500',
   },
 });

@@ -107,7 +107,7 @@ export const WithdrawForm: React.FC<WithdrawFormProps> = ({
         <GradientButton
           label="SEND REQUEST"
           onPress={handleSubmit}
-          height={60}
+          height={50}
         />
       </ScrollView>
 

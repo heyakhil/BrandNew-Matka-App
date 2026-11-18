@@ -70,7 +70,7 @@ const SIDEBAR_TITLES: Record<SidebarScreenKey, string> = {
 const BIDS_TITLES: Record<MyBidsSubView, string> = {
   menu: 'My Bids',
   bidHistory: 'Bid History',
-  gameResults: 'Game Results',
+  gameResults: 'Bid Result History',
 };
 
 const FUNDS_TITLES: Record<FundsSubView, string> = {

@@ -13,12 +13,13 @@ export const styles = StyleSheet.create({
   heading: {
     color: APP_COLORS.textPrimary,
     fontWeight: '800',
+    fontSize: 19,
     textAlign: 'center',
     marginBottom: 4,
   },
   subheading: {
     color: APP_COLORS.textSecondary,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
 });

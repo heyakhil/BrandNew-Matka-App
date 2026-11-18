@@ -22,7 +22,7 @@ export const ContactLinksRow: React.FC<ContactLinksRowProps> = ({
       accessibilityLabel="Chat on WhatsApp"
       onPress={onWhatsAppPress}
       style={styles.link}>
-      <Icon source="whatsapp" size={28} color="#25D366" />
+      <Icon source="whatsapp" size={24} color="#25D366" />
       <Text style={styles.text}>{SUPPORT_PHONE_DISPLAY}</Text>
     </Pressable>
     <Pressable
@@ -30,7 +30,7 @@ export const ContactLinksRow: React.FC<ContactLinksRowProps> = ({
       accessibilityLabel="Join Telegram"
       onPress={onTelegramPress}
       style={styles.link}>
-      <Icon source="send-circle" size={32} color="#2AABEE" />
+      <Icon source="send-circle" size={26} color="#2AABEE" />
       <Text style={styles.text} numberOfLines={1}>
         {TELEGRAM_DISPLAY}
       </Text>
@@ -43,15 +43,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingVertical: 7,
   },
   link: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 5,
   },
   text: {
     color: APP_COLORS.textPrimary,
-    fontSize: 17,
+    fontSize: 14,
+    lineHeight: 17,
   },
 });

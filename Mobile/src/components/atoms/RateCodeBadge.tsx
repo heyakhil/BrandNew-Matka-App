@@ -21,8 +21,8 @@ export const RateCodeBadge: React.FC<RateCodeBadgeProps> = ({ code, color }) => 
 
 const styles = StyleSheet.create({
   badge: {
-    width: 58,
-    height: 46,
+    width: 52,
+    height: 42,
     borderTopLeftRadius: 12,
     borderBottomLeftRadius: 12,
     alignItems: 'center',

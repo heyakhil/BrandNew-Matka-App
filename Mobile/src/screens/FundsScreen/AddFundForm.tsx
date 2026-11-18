@@ -61,7 +61,7 @@ export const AddFundForm: React.FC<AddFundFormProps> = ({
         />
       </ScrollView>
       <View style={styles.footer}>
-        <GradientButton label="ADD CASH" onPress={handleSubmit} height={60} />
+        <GradientButton label="ADD CASH" onPress={handleSubmit} height={50} />
       </View>
     </View>
   );

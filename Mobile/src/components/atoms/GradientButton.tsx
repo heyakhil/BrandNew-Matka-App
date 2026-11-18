@@ -19,8 +19,8 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
   label,
   onPress,
   leading,
-  height = 52,
-  fontSize = 17,
+  height = 48,
+  fontSize = 15,
   disabled = false,
   style,
 }) => (
@@ -63,6 +63,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 10,
   },
   label: {
     color: APP_COLORS.white,
@@ -70,7 +71,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   labelWithLeading: {
-    flex: 1,
+    flexShrink: 1,
+    marginLeft: 4,
   },
   disabled: {
     opacity: 0.5,

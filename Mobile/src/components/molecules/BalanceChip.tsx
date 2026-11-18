@@ -18,7 +18,7 @@ export const BalanceChip: React.FC<BalanceChipProps> = ({
     disabled={!onPress}
     onPress={onPress}
     style={styles.row}>
-    <Icon source="wallet-outline" size={30} color={APP_COLORS.textPrimary} />
+    <Icon source="wallet-outline" size={26} color={APP_COLORS.textPrimary} />
     <Text style={styles.amount}>{balanceRupees}</Text>
   </Pressable>
 );
@@ -27,10 +27,11 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 5,
   },
   amount: {
     color: APP_COLORS.textPrimary,
-    fontSize: 17,
+    fontSize: 15,
+    lineHeight: 18,
   },
 });

@@ -102,7 +102,7 @@ export const PaymentDetailsForm: React.FC<PaymentDetailsFormProps> = ({
         <GradientButton
           label={kind === 'bank' ? 'UPDATE BANK' : 'UPDATE UPI'}
           onPress={handleSave}
-          height={60}
+          height={50}
         />
       </View>
     </View>

@@ -49,7 +49,7 @@ export const PassbookScreen: React.FC<PassbookScreenProps> = ({
       <View style={styles.pagination}>
         <GradientButton
           label="PREVIOUS"
-          fontSize={15}
+          fontSize={13}
           disabled={page === 0}
           onPress={() => setPage(prev => prev - 1)}
           style={styles.pageButton}
@@ -61,7 +61,7 @@ export const PassbookScreen: React.FC<PassbookScreenProps> = ({
         </View>
         <GradientButton
           label="NEXT"
-          fontSize={15}
+          fontSize={13}
           disabled={page >= totalPages - 1}
           onPress={() => setPage(prev => prev + 1)}
           style={styles.pageButton}
@@ -78,11 +78,11 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: 'row',
-    height: 56,
+    height: 48,
   },
   headerText: {
     color: APP_COLORS.textPrimary,
-    fontSize: 15,
+    fontSize: 14,
     textAlignVertical: 'center',
   },
   dateHeader: {
@@ -117,14 +117,14 @@ const styles = StyleSheet.create({
   },
   pageCounter: {
     flex: 1,
-    height: 52,
+    height: 48,
     backgroundColor: APP_COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pageText: {
     color: APP_COLORS.textPrimary,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '700',
   },
 });

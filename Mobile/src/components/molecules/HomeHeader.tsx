@@ -21,7 +21,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   <View style={styles.container}>
     <IconButton
       icon="menu"
-      size={30}
+      size={26}
       iconColor={APP_COLORS.textPrimary}
       onPress={onMenuPress}
       accessibilityLabel="Open navigation menu"
@@ -34,7 +34,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
     <BalanceChip balanceRupees={balanceRupees} onPress={onWalletPress} />
     <IconButton
       icon="refresh"
-      size={30}
+      size={26}
       iconColor={APP_COLORS.textPrimary}
       onPress={onRefreshPress}
       accessibilityLabel="Refresh balance"
@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 72,
+    height: 64,
     paddingHorizontal: 8,
     backgroundColor: APP_COLORS.primaryBackground,
   },
@@ -55,15 +55,16 @@ const styles = StyleSheet.create({
     margin: 0,
   },
   logo: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginLeft: 8,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    marginLeft: 4,
   },
   brand: {
     flex: 1,
     color: APP_COLORS.textPrimary,
-    fontSize: 20,
-    marginLeft: 12,
+    fontSize: 17,
+    lineHeight: 21,
+    marginLeft: 8,
   },
 });

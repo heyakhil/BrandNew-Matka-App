@@ -10,17 +10,17 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 24,
-    gap: 16,
+    gap: 12,
   },
   sectionTitle: {
     color: APP_COLORS.textPrimary,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
     marginTop: 12,
   },
   fields: {
-    gap: 16,
+    gap: 12,
   },
   error: {
     color: APP_COLORS.danger,
@@ -34,6 +34,6 @@ export const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 12,
-    paddingVertical: 14,
+    paddingVertical: 10,
   },
 });

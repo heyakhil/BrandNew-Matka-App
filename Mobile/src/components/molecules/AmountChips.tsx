@@ -30,14 +30,14 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 14,
+    gap: 10,
     paddingHorizontal: 8,
-    marginTop: 16,
+    marginTop: 12,
   },
   chip: {
     width: '30.5%',
-    height: 52,
-    borderRadius: 26,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: APP_COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -49,6 +49,6 @@ const styles = StyleSheet.create({
   },
   label: {
     color: APP_COLORS.textPrimary,
-    fontSize: 18,
+    fontSize: 16,
   },
 });

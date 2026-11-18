@@ -11,7 +11,7 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
     letterSpacing: 0.6,
-    paddingVertical: 14,
+    paddingVertical: 11,
   },
   gridContent: {
     paddingHorizontal: 14,
@@ -33,17 +33,17 @@ export const styles = StyleSheet.create({
   },
   cardContent: {
     alignItems: 'center',
-    paddingVertical: 18,
+    paddingVertical: 10,
     paddingHorizontal: 10,
   },
   iconCircle: {
-    marginBottom: 12,
+    marginBottom: 6,
   },
   accentBar: {
     width: '62%',
     height: 3,
     borderRadius: 2,
-    marginBottom: 10,
+    marginBottom: 6,
   },
   cardTitle: {
     color: APP_COLORS.textPrimary,

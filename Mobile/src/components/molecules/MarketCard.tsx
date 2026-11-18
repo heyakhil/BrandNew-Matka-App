@@ -34,10 +34,10 @@ export const MarketCard: React.FC<MarketCardProps> = ({
   return (
     <View style={styles.card}>
       <GradientCircle
-        size={44}
+        size={54}
         onPress={() => onOpenChart(market)}
         accessibilityLabel={`View chart for ${market.name}`}>
-        <Icon source="chart-bar" size={26} color={APP_COLORS.white} />
+        <Icon source="chart-bar" size={33} color={APP_COLORS.white} />
       </GradientCircle>
 
       <View style={styles.info}>
@@ -54,11 +54,11 @@ export const MarketCard: React.FC<MarketCardProps> = ({
       <View style={styles.play}>
         <StatusBadge status={market.status} />
         <GradientCircle
-          size={44}
+          size={54}
           disabled={isClosed}
           onPress={() => onPlaceBet(market)}
           accessibilityLabel={`Play ${market.name}`}>
-          <Icon source="play" size={30} color={APP_COLORS.white} />
+          <Icon source="play" size={36} color={APP_COLORS.white} />
         </GradientCircle>
         <Text style={styles.playLabel}>Play Game</Text>
       </View>
@@ -72,8 +72,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: APP_COLORS.secondary,
     borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
+    padding: 6,
+    paddingHorizontal: 15,
+    marginBottom: 8,
     elevation: 3,
     shadowColor: APP_COLORS.dark,
     shadowOpacity: 0.15,
@@ -82,39 +83,44 @@ const styles = StyleSheet.create({
   },
   info: {
     flex: 1,
-    marginHorizontal: 10,
+    marginHorizontal: 8,
     alignItems: 'center',
   },
   name: {
     color: APP_COLORS.textPrimary,
-    fontSize: 18,
+    fontSize: 16,
+    lineHeight: 19,
     fontWeight: '600',
   },
   result: {
     color: APP_COLORS.gradientStart,
-    fontSize: 18,
+    fontSize: 16,
+    lineHeight: 19,
     fontWeight: '700',
     marginVertical: 2,
   },
   timings: {
     flexDirection: 'row',
-    gap: 18,
+    gap: 12,
   },
   timeLabel: {
     color: APP_COLORS.textSecondary,
     fontSize: 12,
+    lineHeight: 15,
   },
   timeValue: {
     color: APP_COLORS.textSecondary,
-    fontSize: 14,
+    fontSize: 13,
+    lineHeight: 16,
   },
   play: {
     width: 96,
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
   },
   playLabel: {
     color: APP_COLORS.textSecondary,
     fontSize: 12,
+    lineHeight: 15,
   },
 });

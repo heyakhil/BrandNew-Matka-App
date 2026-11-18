@@ -41,14 +41,14 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           onPress={() => onTabPress(tab.key)}
           style={styles.tab}>
           {tab.key === 'home' ? (
-            <GradientCircle size={72}>
-              <Icon source={tab.icon} size={34} color={APP_COLORS.white} />
+            <GradientCircle size={56}>
+              <Icon source={tab.icon} size={28} color={APP_COLORS.white} />
             </GradientCircle>
           ) : (
             <>
               <Icon
                 source={tab.icon}
-                size={34}
+                size={27}
                 color={focused ? APP_COLORS.gradientStart : '#777777'}
               />
               <Text
@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 82,
+    height: 64,
     backgroundColor: APP_COLORS.secondary,
     elevation: 12,
     shadowColor: APP_COLORS.dark,
@@ -80,11 +80,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 2,
   },
   label: {
     color: '#777777',
-    fontSize: 13,
+    fontSize: 11,
+    lineHeight: 14,
   },
   labelActive: {
     color: APP_COLORS.gradientStart,

@@ -120,7 +120,6 @@ export const styles = StyleSheet.create({
     marginBottom: 14,
   },
   entryInput: {
-    backgroundColor: APP_COLORS.primaryBackground,
     marginBottom: 10,
   },
   inputRow: {
@@ -129,7 +128,6 @@ export const styles = StyleSheet.create({
   },
   flexInput: {
     flex: 1,
-    backgroundColor: APP_COLORS.primaryBackground,
     marginBottom: 10,
   },
   oddEvenRow: {

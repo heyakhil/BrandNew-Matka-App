@@ -8,9 +8,9 @@ import {
   Menu,
   Surface,
   Text,
-  TextInput,
   TouchableRipple,
 } from 'react-native-paper';
+import { FormInput } from '../../components/molecules/FormInput';
 import { GAME_WIN_RATES } from '../../data/mockData';
 import { APP_COLORS } from '../../theme/paperTheme';
 import type {
@@ -328,8 +328,7 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                   </View>
                 ) : (
                   <View style={styles.inputRow}>
-                    <TextInput
-                      mode="outlined"
+                    <FormInput
                       label={
                         game.id === 'HS'
                           ? 'Panna (3 digits)'
@@ -347,13 +346,10 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                         setErrorText(null);
                       }}
                       keyboardType="number-pad"
-                      style={styles.flexInput}
-                      outlineColor={APP_COLORS.border}
-                      activeOutlineColor={APP_COLORS.accent}
+                      containerStyle={styles.flexInput}
                     />
                     {(game.id === 'HS' || game.id === 'FS') && (
-                      <TextInput
-                        mode="outlined"
+                      <FormInput
                         label={game.id === 'HS' ? 'Other Ank' : 'Close Panna'}
                         value={secondaryInput}
                         onChangeText={val => {
@@ -362,18 +358,14 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                         }}
                         keyboardType="number-pad"
                         maxLength={game.id === 'HS' ? 1 : 3}
-                        style={styles.flexInput}
-                        outlineColor={APP_COLORS.border}
-                        activeOutlineColor={APP_COLORS.accent}
+                        containerStyle={styles.flexInput}
                       />
                     )}
                   </View>
                 )}
 
-                <TextInput
-                  mode="outlined"
-                  label="Points / Amount"
-                  placeholder="₹5 – ₹10,000"
+                <FormInput
+                  label="Points / Amount (₹5 – ₹10,000)"
                   value={stakeText}
                   onChangeText={val => {
                     setStakeText(val.replace(/\D/g, ''));
@@ -381,9 +373,7 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                   }}
                   keyboardType="number-pad"
                   maxLength={5}
-                  style={styles.entryInput}
-                  outlineColor={APP_COLORS.border}
-                  activeOutlineColor={APP_COLORS.accent}
+                  containerStyle={styles.entryInput}
                 />
 
                 <Button

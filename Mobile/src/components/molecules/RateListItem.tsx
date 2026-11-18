@@ -40,7 +40,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: APP_COLORS.border,
-    marginBottom: 10,
+    marginBottom: 8,
     overflow: 'hidden',
   },
   row: {
@@ -49,18 +49,23 @@ const styles = StyleSheet.create({
   },
   middle: {
     flex: 1,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
   },
   name: {
     color: APP_COLORS.textPrimary,
     fontWeight: '700',
+    fontSize: 13,
+    lineHeight: 16,
   },
   sub: {
     color: APP_COLORS.textSecondary,
+    lineHeight: 14,
   },
   amount: {
     color: APP_COLORS.accent,
     fontWeight: '800',
-    paddingRight: 16,
+    fontSize: 15,
+    lineHeight: 18,
+    paddingRight: 12,
   },
 });

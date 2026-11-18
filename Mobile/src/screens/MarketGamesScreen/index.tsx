@@ -46,7 +46,7 @@ export const MarketGamesScreen: React.FC<MarketGamesScreenProps> = ({
               onPress={disabled ? undefined : () => onSelectGame(item)}>
               <Card.Content style={styles.cardContent}>
                 <Avatar.Icon
-                  size={56}
+                  size={48}
                   icon={item.icon}
                   color={APP_COLORS.textPrimary}
                   style={[styles.iconCircle, { backgroundColor: item.color }]}

@@ -1,12 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
-import {
-  Button,
-  HelperText,
-  Surface,
-  Text,
-  TextInput,
-} from 'react-native-paper';
+import { Button, HelperText, Surface, Text, TextInput } from 'react-native-paper';
+import { FormInput } from '../../components/molecules/FormInput';
 import { APP_COLORS } from '../../theme/paperTheme';
 
 interface ChangePasswordScreenProps {
@@ -50,8 +45,7 @@ export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({
         RoyalClubMatka Security
       </Text>
 
-      <TextInput
-        mode="outlined"
+      <FormInput
         label="New Password"
         value={password}
         onChangeText={val => {
@@ -65,13 +59,10 @@ export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({
             onPress={() => setHidePassword(prev => !prev)}
           />
         }
-        style={styles.input}
-        outlineColor={APP_COLORS.border}
-        activeOutlineColor={APP_COLORS.accent}
+        containerStyle={styles.input}
       />
 
-      <TextInput
-        mode="outlined"
+      <FormInput
         label="Confirm Password"
         value={confirmPassword}
         onChangeText={val => {
@@ -79,9 +70,7 @@ export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({
           setErrorText(null);
         }}
         secureTextEntry={hidePassword}
-        style={styles.input}
-        outlineColor={APP_COLORS.border}
-        activeOutlineColor={APP_COLORS.accent}
+        containerStyle={styles.input}
       />
 
       {errorText && (
@@ -110,12 +99,12 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingTop: 36,
+    paddingTop: 28,
   },
   logoBadge: {
-    width: 78,
-    height: 78,
-    borderRadius: 39,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     backgroundColor: APP_COLORS.secondary,
     borderWidth: 2,
     borderColor: APP_COLORS.accent,
@@ -135,7 +124,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   input: {
-    backgroundColor: APP_COLORS.secondary,
     marginBottom: 14,
   },
   submitBtn: {

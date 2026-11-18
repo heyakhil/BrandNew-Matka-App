@@ -1,13 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
-import {
-  Avatar,
-  Button,
-  Card,
-  HelperText,
-  Text,
-  TextInput,
-} from 'react-native-paper';
+import { Avatar, Button, Card, HelperText, Text } from 'react-native-paper';
+import { FormInput } from '../../components/molecules/FormInput';
 import { APP_COLORS } from '../../theme/paperTheme';
 import type { UserProfile } from '../../types/matka';
 
@@ -51,7 +45,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}>
       <Avatar.Text
-        size={74}
+        size={64}
         label={initials}
         style={styles.avatar}
         labelStyle={styles.avatarLabel}
@@ -65,20 +59,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
       <Card style={styles.card} mode="contained">
         <Card.Content>
-          <TextInput
-            mode="outlined"
+          <FormInput
             label="Full Name"
             value={name}
             onChangeText={val => {
               setName(val);
               setErrorText(null);
             }}
-            style={styles.input}
-            outlineColor={APP_COLORS.border}
-            activeOutlineColor={APP_COLORS.accent}
+            containerStyle={styles.input}
           />
-          <TextInput
-            mode="outlined"
+          <FormInput
             label="Mobile Number"
             value={phone}
             onChangeText={val => {
@@ -87,19 +77,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             }}
             keyboardType="phone-pad"
             maxLength={10}
-            style={styles.input}
-            outlineColor={APP_COLORS.border}
-            activeOutlineColor={APP_COLORS.accent}
+            containerStyle={styles.input}
           />
-          <TextInput
-            mode="outlined"
+          <FormInput
             label="Email Address"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
-            style={styles.input}
-            outlineColor={APP_COLORS.border}
-            activeOutlineColor={APP_COLORS.accent}
+            containerStyle={styles.input}
           />
 
           {errorText && (
@@ -130,7 +115,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingTop: 22,
+    paddingTop: 18,
     paddingBottom: 28,
   },
   avatar: {
@@ -159,7 +144,6 @@ const styles = StyleSheet.create({
     borderColor: APP_COLORS.border,
   },
   input: {
-    backgroundColor: APP_COLORS.primaryBackground,
     marginBottom: 12,
   },
   saveBtn: {

@@ -29,7 +29,7 @@ export const PillInput: React.FC<PillInputProps> = ({
     <View style={styles.pill}>
       <IconCircle
         icon={icon}
-        size={56}
+        size={48}
         backgroundColor="#FBB92D"
         iconColor={APP_COLORS.white}
       />
@@ -53,9 +53,9 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 68,
+    height: 60,
     padding: 6,
-    borderRadius: 34,
+    borderRadius: 30,
     backgroundColor: APP_COLORS.secondary,
     elevation: 3,
     shadowColor: APP_COLORS.dark,
@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     marginLeft: 12,
-    fontSize: 18,
+    fontSize: 16,
     color: APP_COLORS.textPrimary,
   },
   error: {

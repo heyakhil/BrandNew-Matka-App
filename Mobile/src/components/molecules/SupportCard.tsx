@@ -18,7 +18,7 @@ export const SupportCard: React.FC<SupportCardProps> = ({ onPress }) => (
       Call or WhatsApp for Withdraw Related Queries
     </Text>
     <View style={styles.row}>
-      <Icon source="whatsapp" size={64} color="#25D366" />
+      <Icon source="whatsapp" size={44} color="#25D366" />
       <View style={styles.info}>
         <Text style={styles.hours}>{SUPPORT_HOURS}</Text>
         <Text style={styles.phone}>{SUPPORT_PHONE_DISPLAY}</Text>
@@ -31,8 +31,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: APP_COLORS.secondary,
     borderRadius: 8,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     elevation: 3,
     shadowColor: APP_COLORS.dark,
     shadowOpacity: 0.15,
@@ -41,24 +41,27 @@ const styles = StyleSheet.create({
   },
   heading: {
     color: APP_COLORS.textPrimary,
-    fontSize: 16,
+    fontSize: 15,
+    lineHeight: 18,
     textAlign: 'center',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    marginTop: 14,
+    gap: 12,
+    marginTop: 8,
   },
   info: {
     flex: 1,
   },
   hours: {
     color: APP_COLORS.success,
-    fontSize: 22,
+    fontSize: 18,
+    lineHeight: 22,
   },
   phone: {
     color: APP_COLORS.textPrimary,
-    fontSize: 15,
+    fontSize: 14,
+    lineHeight: 17,
   },
 });

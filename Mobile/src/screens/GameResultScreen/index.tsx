@@ -1,54 +1,72 @@
-import React, { useMemo, useState } from 'react';
-import { FlatList, View } from 'react-native';
-import { Searchbar } from 'react-native-paper';
-import { ResultGridCard } from '../../components/molecules/ResultGridCard';
+import React from 'react';
+import { FlatList, StyleSheet, View } from 'react-native';
+import { Text } from 'react-native-paper';
+import { ResultRow } from '../../components/molecules/ResultRow';
 import { APP_COLORS } from '../../theme/paperTheme';
 import type { MarketItem } from '../../types/matka';
-import { styles } from './styles';
 
 interface GameResultScreenProps {
   markets: MarketItem[];
   onSelectMarket: (market: MarketItem) => void;
 }
 
+const todayLabel = (): string => new Date().toISOString().slice(0, 10);
+
 export const GameResultScreen: React.FC<GameResultScreenProps> = ({
   markets,
   onSelectMarket,
-}) => {
-  const [query, setQuery] = useState('');
-
-  const mainMarkets = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return markets
-      .filter(m => m.category === 'main')
-      .filter(m => (q ? m.name.toLowerCase().includes(q) : true));
-  }, [markets, query]);
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.searchWrap}>
-        <Searchbar
-          placeholder="Search market result..."
-          value={query}
-          onChangeText={setQuery}
-          style={styles.searchbar}
-          inputStyle={styles.searchInput}
-          placeholderTextColor={APP_COLORS.textSecondary}
-          iconColor={APP_COLORS.accent}
-        />
+}) => (
+  <View style={styles.container}>
+    <View style={styles.dateRow}>
+      <Text style={styles.dateLabel}>Select Date :</Text>
+      <View style={styles.datePill}>
+        <Text style={styles.dateText}>{todayLabel()}</Text>
       </View>
-
-      <FlatList
-        data={mainMarkets}
-        keyExtractor={item => item.id}
-        numColumns={2}
-        columnWrapperStyle={styles.columnWrapper}
-        contentContainerStyle={styles.gridContent}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <ResultGridCard market={item} onPress={onSelectMarket} />
-        )}
-      />
     </View>
-  );
-};
+
+    <FlatList
+      data={markets.filter(m => m.category === 'main')}
+      keyExtractor={item => item.id}
+      contentContainerStyle={styles.list}
+      showsVerticalScrollIndicator={false}
+      renderItem={({ item }) => (
+        <ResultRow market={item} onPress={onSelectMarket} />
+      )}
+    />
+  </View>
+);
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: APP_COLORS.primaryBackground,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  dateLabel: {
+    color: APP_COLORS.textPrimary,
+    fontSize: 15,
+  },
+  datePill: {
+    width: '48%',
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: APP_COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateText: {
+    color: APP_COLORS.textPrimary,
+    fontSize: 15,
+  },
+  list: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 24,
+  },
+});
