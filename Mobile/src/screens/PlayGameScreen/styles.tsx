@@ -132,6 +132,7 @@ export const styles = StyleSheet.create({
   },
   oddEvenRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     marginBottom: 12,
   },

@@ -42,7 +42,7 @@ export const DEFAULT_STAKE_LIMITS: StakeLimits = {
 };
 
 export function rupeesToPaise(rupees: number): number {
-  if (!Number.isInteger(rupees) || rupees <= 0) {
+  if (!Number.isSafeInteger(rupees) || rupees <= 0 || !Number.isSafeInteger(rupees * PAISE_PER_RUPEE)) {
     throw new MatkaRulesError('Rupee stake must be a positive whole number.');
   }
   return rupees * PAISE_PER_RUPEE;
@@ -67,16 +67,23 @@ export function winningPaise(stakePaise: number, rate: Rate): number {
     throw new MatkaRulesError('Stake must be a positive whole number of paise.');
   }
   if (
-    !Number.isInteger(rate.numerator) ||
-    !Number.isInteger(rate.denominator) ||
+    !Number.isSafeInteger(rate.numerator) ||
+    !Number.isSafeInteger(rate.denominator) ||
     rate.numerator <= 0 ||
     rate.denominator <= 0
   ) {
     throw new MatkaRulesError('Rate must be a positive fraction.');
   }
-  const product = stakePaise * rate.numerator;
-  if (product % rate.denominator !== 0) {
+  if (!Number.isSafeInteger(stakePaise)) {
+    throw new MatkaRulesError('Stake exceeds the safe calculation limit.');
+  }
+  const product = BigInt(stakePaise) * BigInt(rate.numerator);
+  if (product % BigInt(rate.denominator) !== 0n) {
     throw new MatkaRulesError('Winning amount is not a whole number of paise.');
   }
-  return product / rate.denominator;
+  const payout = product / BigInt(rate.denominator);
+  if (payout > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new MatkaRulesError('Winning amount exceeds the safe calculation limit.');
+  }
+  return Number(payout);
 }

@@ -11,6 +11,7 @@ interface GradientButtonProps {
   leading?: React.ReactNode;
   height?: number;
   fontSize?: number;
+  contentPadding?: number;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 }
@@ -21,6 +22,7 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
   leading,
   height = 48,
   fontSize = 15,
+  contentPadding = 10,
   disabled = false,
   style,
 }) => (
@@ -40,7 +42,7 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
       colors={BRAND_GRADIENT}
       start={{ x: 0, y: 0.5 }}
       end={{ x: 1, y: 0.5 }}
-      style={[styles.gradient, { height, borderRadius: height / 2 }]}>
+      style={[styles.gradient, { height, borderRadius: height / 2, paddingHorizontal: contentPadding }]}>
       {leading}
       <Text
         numberOfLines={1}

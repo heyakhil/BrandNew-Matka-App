@@ -1,0 +1,8 @@
+{
+  "name": "royal-club-admin",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "tsc -b && vite build" },
+  "dependencies": { "react": "^19.3.0", "react-dom": "^19.3.0" },
+  "devDependencies": { "@types/react": "^19.2.0", "@types/react-dom": "^19.2.0", "typescript": "^5.9.3", "vite": "^7.2.0" }
+}

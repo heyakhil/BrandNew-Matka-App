@@ -1,141 +1,220 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, View } from 'react-native';
-import {
-  Avatar,
-  Card,
-  Chip,
-  IconButton,
-  Surface,
-  Text,
-} from 'react-native-paper';
+import { FlatList, StyleSheet, View } from 'react-native';
+import { IconButton, Menu, Text } from 'react-native-paper';
+import { GradientButton } from '../../components/atoms/GradientButton';
 import { APP_COLORS } from '../../theme/paperTheme';
 import type { BidRecord } from '../../types/matka';
 import { formatRupees } from '../../utils/matkaHelpers';
-import { styles } from './styles';
 
 interface BidHistoryScreenProps {
   bids: BidRecord[];
 }
 
-const DATE_FILTERS = ['Today', 'Yesterday', 'All Dates'] as const;
+const PAGE_SIZE = 10;
 
 export const BidHistoryScreen: React.FC<BidHistoryScreenProps> = ({ bids }) => {
-  const [dateIndex, setDateIndex] = useState(0);
-  const currentFilter = DATE_FILTERS[dateIndex];
-
-  const filteredBids = useMemo(() => {
-    if (currentFilter === 'Yesterday') {
-      return [];
-    }
-    return bids;
-  }, [bids, currentFilter]);
-
-  const handleCycleDate = (delta: number): void => {
-    setDateIndex(prev => (prev + delta + DATE_FILTERS.length) % DATE_FILTERS.length);
-  };
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [gameFilter, setGameFilter] = useState('All Types');
+  const [page, setPage] = useState(0);
+  const gameTypes = useMemo(
+    () => [...new Set(bids.map(bid => bid.gameName))],
+    [bids],
+  );
+  const filtered = useMemo(
+    () =>
+      bids.filter(
+        bid => gameFilter === 'All Types' || bid.gameName === gameFilter,
+      ),
+    [bids, gameFilter],
+  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
 
   return (
     <View style={styles.container}>
-      <View style={styles.filterBar}>
-        <View style={styles.dateRow}>
-          <IconButton
-            icon="calendar"
-            mode="contained"
-            size={20}
-            containerColor={APP_COLORS.accent}
-            iconColor={APP_COLORS.onAccent}
-            onPress={() => handleCycleDate(1)}
-            accessibilityLabel="Switch date filter"
-          />
-          <Text variant="labelLarge" style={styles.dateLabel}>
-            {currentFilter}
+      <View style={styles.toolbar}>
+        <Text style={styles.title}>BID HISTORY</Text>
+        <Menu
+          visible={filterOpen}
+          onDismiss={() => setFilterOpen(false)}
+          anchor={
+            <IconButton
+              icon="filter-variant"
+              accessibilityLabel="Filter game type"
+              onPress={() => setFilterOpen(true)}
+            />
+          }
+        >
+          {['All Types', ...gameTypes].map(type => (
+            <Menu.Item
+              key={type}
+              title={type}
+              onPress={() => {
+                setGameFilter(type);
+                setPage(0);
+                setFilterOpen(false);
+              }}
+            />
+          ))}
+        </Menu>
+      </View>
+      <Text style={styles.filterLabel}>Filter Type: {gameFilter}</Text>
+      <FlatList
+        data={filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.list}
+        ListEmptyComponent={
+          <Text style={styles.empty}>No bid history found</Text>
+        }
+        renderItem={({ item }) => <BidHistoryCard bid={item} />}
+      />
+      <View style={styles.pagination}>
+        <GradientButton
+          label="PREVIOUS"
+          disabled={safePage === 0}
+          onPress={() => setPage(safePage - 1)}
+          style={styles.pageButton}
+        />
+        <View style={styles.pageCount}>
+          <Text>
+            ({safePage + 1}/{totalPages})
           </Text>
         </View>
-
-        <View style={styles.navButtons}>
-          <IconButton
-            icon="chevron-left"
-            mode="contained"
-            size={20}
-            containerColor={APP_COLORS.primaryBackground}
-            iconColor={APP_COLORS.textPrimary}
-            onPress={() => handleCycleDate(-1)}
-            accessibilityLabel="Previous date"
-          />
-          <IconButton
-            icon="chevron-right"
-            mode="contained"
-            size={20}
-            containerColor={APP_COLORS.primaryBackground}
-            iconColor={APP_COLORS.textPrimary}
-            onPress={() => handleCycleDate(1)}
-            accessibilityLabel="Next date"
-          />
-        </View>
-      </View>
-
-      {filteredBids.length === 0 ? (
-        <Card style={styles.emptyCard} mode="contained">
-          <Card.Content style={styles.emptyContent}>
-            <Surface style={styles.searchBox} elevation={0}>
-              <Avatar.Icon
-                size={34}
-                icon="magnify"
-                color={APP_COLORS.accent}
-                style={styles.searchIconBg}
-              />
-            </Surface>
-            <Text variant="titleMedium" style={styles.emptyTitle}>
-              No Bid History Found
-            </Text>
-            <Text variant="bodySmall" style={styles.emptySubtitle}>
-              Try adjusting your search or filters, or place a bet from Home.
-            </Text>
-          </Card.Content>
-        </Card>
-      ) : (
-        <FlatList
-          data={filteredBids}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <Card style={styles.bidCard} mode="contained">
-              <Card.Content>
-                <View style={styles.bidRow}>
-                  <Text variant="titleSmall" style={styles.bidMarket}>
-                    {item.marketName}
-                  </Text>
-                  <Chip
-                    compact
-                    style={styles.statusChip}
-                    textStyle={styles.statusChipText}>
-                    {item.status}
-                  </Chip>
-                </View>
-
-                <View style={styles.bidRow}>
-                  <Text variant="bodySmall" style={styles.bidMeta}>
-                    {item.gameName} ({item.side.toUpperCase()})
-                  </Text>
-                  <Text variant="titleMedium" style={styles.bidNumber}>
-                    #{item.number}
-                  </Text>
-                </View>
-
-                <View style={styles.bidRow}>
-                  <Text variant="labelSmall" style={styles.bidMeta}>
-                    Stake: {formatRupees(item.stakeRupees)} • {item.timeLabel}
-                  </Text>
-                  <Text variant="labelMedium" style={{ color: APP_COLORS.success }}>
-                    Win: {formatRupees(item.potentialWinRupees)}
-                  </Text>
-                </View>
-              </Card.Content>
-            </Card>
-          )}
+        <GradientButton
+          label="NEXT"
+          disabled={safePage >= totalPages - 1}
+          onPress={() => setPage(safePage + 1)}
+          style={styles.pageButton}
         />
-      )}
+      </View>
     </View>
   );
 };
+
+const BidHistoryCard: React.FC<{ bid: BidRecord }> = ({ bid }) => (
+  <View style={styles.card}>
+    <Text style={styles.market}>
+      {bid.marketName}
+      {bid.side === 'full' ? '' : ` (${bid.side})`}
+    </Text>
+    <View style={styles.columns}>
+      <Column label="Game Type" value={bid.gameName} />
+      <Column label="Digits" value={bid.number} />
+      <Column label="Points" value={String(bid.stakeRupees)} />
+    </View>
+    <View style={styles.columns}>
+      <Column label="Bid ID" value={bid.id} />
+      <Column label="Bid Date" value={bid.dateLabel} />
+    </View>
+    <Text style={styles.transactionTime}>
+      Transaction Time: {bid.timeLabel}
+    </Text>
+    <Text
+      style={[
+        styles.outcome,
+        bid.status === 'Won'
+          ? styles.won
+          : bid.status === 'Lost'
+          ? styles.lost
+          : styles.pending,
+      ]}
+    >
+      {bid.status === 'Won'
+        ? `Congratulations! You Won ${formatRupees(bid.potentialWinRupees)}`
+        : bid.status === 'Lost'
+        ? 'Better luck next time'
+        : bid.status === 'Refunded'
+        ? 'Stake refunded'
+        : 'Result pending'}
+    </Text>
+  </View>
+);
+
+const Column: React.FC<{ label: string; value: string }> = ({
+  label,
+  value,
+}) => (
+  <View style={styles.column}>
+    <Text style={styles.columnLabel}>{label}</Text>
+    <Text style={styles.columnValue} numberOfLines={2}>
+      {value}
+    </Text>
+  </View>
+);
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: APP_COLORS.primaryBackground },
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  title: { fontSize: 19, color: APP_COLORS.textPrimary },
+  filterLabel: {
+    textAlign: 'right',
+    marginRight: 20,
+    marginBottom: 6,
+    color: APP_COLORS.textSecondary,
+  },
+  list: { paddingHorizontal: 10, paddingBottom: 16 },
+  empty: {
+    textAlign: 'center',
+    marginTop: 40,
+    color: APP_COLORS.textSecondary,
+  },
+  card: {
+    backgroundColor: APP_COLORS.white,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 14,
+    elevation: 2,
+  },
+  market: {
+    backgroundColor: APP_COLORS.primaryBackground,
+    textAlign: 'center',
+    padding: 12,
+    fontSize: 18,
+    color: APP_COLORS.white,
+  },
+  columns: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: APP_COLORS.border,
+  },
+  column: { flex: 1, alignItems: 'center', paddingHorizontal: 3 },
+  columnLabel: {
+    color: APP_COLORS.textPrimary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  columnValue: {
+    color: APP_COLORS.textPrimary,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 6,
+  },
+  transactionTime: {
+    textAlign: 'center',
+    padding: 10,
+    color: APP_COLORS.textPrimary,
+  },
+  outcome: {
+    textAlign: 'center',
+    padding: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: APP_COLORS.border,
+  },
+  won: { color: APP_COLORS.success },
+  lost: { color: APP_COLORS.danger },
+  pending: { color: APP_COLORS.textSecondary },
+  pagination: { flexDirection: 'row', gap: 8, padding: 10 },
+  pageButton: { flex: 1 },
+  pageCount: {
+    flex: 1,
+    backgroundColor: APP_COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { ScrollView, TextInput as RNTextInput, View } from 'react-native';
 import {
   Button,
@@ -20,6 +20,7 @@ import type {
   SessionSide,
 } from '../../types/matka';
 import { formatRupees, validateGameInput } from '../../utils/matkaHelpers';
+import { stakeForItem } from '../../services/bets';
 import { styles } from './styles';
 
 export interface SubmittedBidItem {
@@ -29,6 +30,7 @@ export interface SubmittedBidItem {
   number: string;
   stakeRupees: number;
   potentialWinRupees: number;
+  halfVariant?: 'openPannaCloseAnk' | 'openAnkClosePanna';
 }
 
 interface PlayGameScreenProps {
@@ -36,7 +38,7 @@ interface PlayGameScreenProps {
   game: MarketGameOption;
   balanceRupees: number;
   onBack: () => void;
-  onPlaceBets: (items: SubmittedBidItem[]) => void;
+  onPlaceBets: (items: SubmittedBidItem[], requestId: string) => Promise<void>;
 }
 
 const SINGLE_DIGIT_ORDER = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
@@ -60,8 +62,11 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
   const [secondaryInput, setSecondaryInput] = useState('');
   const [stakeText, setStakeText] = useState('10');
   const [oddEvenChoice, setOddEvenChoice] = useState<'ODD' | 'EVEN'>('ODD');
+  const [halfVariant, setHalfVariant] = useState<'openPannaCloseAnk' | 'openAnkClosePanna'>('openPannaCloseAnk');
   const [addedBids, setAddedBids] = useState<SubmittedBidItem[]>([]);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const requestRef = useRef<{ signature: string; id: string } | null>(null);
 
   const todayLabel = useMemo(() => {
     const d = new Date();
@@ -72,9 +77,15 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
   }, []);
 
   const rateMultiplier = useMemo(() => {
+    const rateKey = ({ SD: 'single', JD: 'jodi', RB: 'jodi', SP: 'sp', DP: 'dp', TP: 'tp', HS: 'halfSangam', FS: 'fullSangam' } as const)[game.rateKey];
+    const liveRate = market.rateCard?.[rateKey];
+    if (liveRate) return liveRate.numerator / liveRate.denominator;
     const rate = GAME_WIN_RATES.find(r => r.code === game.rateKey);
     return rate ? rate.rateMultiplier : 9.5;
-  }, [game.rateKey]);
+  }, [game.rateKey, market.rateCard]);
+
+  const minStake = (market.limits?.minPaise ?? 1000) / 100;
+  const maxStake = (market.limits?.maxPaise ?? 1000000) / 100;
 
   const effectiveSide: SessionSide | 'full' = game.requiresSide
     ? isCloseOnly
@@ -104,16 +115,16 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
 
   const activeBids = game.id === 'SD' ? singleDigitBids : addedBids;
 
-  const totalBidsCount = activeBids.length;
+  const totalBidsCount = activeBids.reduce((sum, bid) => sum + stakeForItem(bid) / bid.stakeRupees, 0);
   const totalAmount = useMemo(
-    () => activeBids.reduce((sum, b) => sum + b.stakeRupees, 0),
+    () => activeBids.reduce((sum, b) => sum + stakeForItem(b), 0),
     [activeBids],
   );
 
   const handleAddSingleBid = (): void => {
     const stake = Number(stakeText) || 0;
-    if (stake < 5 || stake > 10000) {
-      setErrorText('Amount must be between ₹5 and ₹10,000.');
+    if (stake < minStake || stake > maxStake) {
+      setErrorText(`Amount must be between ₹${minStake} and ₹${maxStake}.`);
       return;
     }
 
@@ -152,6 +163,7 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
       number: validation.formattedNumber,
       stakeRupees: stake,
       potentialWinRupees: stake * rateMultiplier,
+      ...(game.id === 'HS' ? { halfVariant } : {}),
     };
     setAddedBids(prev => [newItem, ...prev]);
     setPrimaryInput('');
@@ -159,16 +171,16 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
     setErrorText(null);
   };
 
-  const handleSubmitAll = (): void => {
+  const handleSubmitAll = async (): Promise<void> => {
     if (activeBids.length === 0) {
       return;
     }
     if (game.id === 'SD') {
       const invalid = activeBids.find(
-        b => b.stakeRupees < 5 || b.stakeRupees > 10000,
+        b => b.stakeRupees < minStake || b.stakeRupees > maxStake,
       );
       if (invalid) {
-        setErrorText('Each digit amount must be between ₹5 and ₹10,000.');
+        setErrorText(`Each digit amount must be between ₹${minStake} and ₹${maxStake}.`);
         return;
       }
     }
@@ -176,7 +188,14 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
       setErrorText('Insufficient wallet balance.');
       return;
     }
-    onPlaceBets(activeBids);
+    const signature = JSON.stringify(activeBids);
+    if (requestRef.current?.signature !== signature) {
+      requestRef.current = { signature, id: `${Date.now()}-${Math.random().toString(36).slice(2)}` };
+    }
+    setSubmitting(true);
+    try { await onPlaceBets(activeBids, requestRef.current.id); }
+    catch (error) { setErrorText(error instanceof Error ? error.message : 'Unable to place bets.'); }
+    finally { setSubmitting(false); }
   };
 
   return (
@@ -278,7 +297,7 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                     setDigitAmounts(prev => ({ ...prev, [digit]: cleaned }));
                     setErrorText(null);
                   }}
-                  placeholder="₹5-₹10000"
+                  placeholder={`₹${minStake}-₹${maxStake}`}
                   placeholderTextColor={APP_COLORS.textSecondary}
                   keyboardType="number-pad"
                   maxLength={5}
@@ -364,8 +383,14 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                   </View>
                 )}
 
+                {game.id === 'HS' && (
+                  <View style={styles.oddEvenRow}>
+                    <Button mode={halfVariant === 'openPannaCloseAnk' ? 'contained' : 'outlined'} onPress={() => setHalfVariant('openPannaCloseAnk')}>Open panna + Close ank</Button>
+                    <Button mode={halfVariant === 'openAnkClosePanna' ? 'contained' : 'outlined'} onPress={() => setHalfVariant('openAnkClosePanna')}>Open ank + Close panna</Button>
+                  </View>
+                )}
                 <FormInput
-                  label="Points / Amount (₹5 – ₹10,000)"
+                  label={`Points / Amount (₹${minStake} – ₹${maxStake})`}
                   value={stakeText}
                   onChangeText={val => {
                     setStakeText(val.replace(/\D/g, ''));
@@ -395,8 +420,10 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                       #{bid.number} ({bid.side.toUpperCase()})
                     </Text>
                     <Text variant="labelSmall" style={styles.bidItemMeta}>
-                      Stake: {formatRupees(bid.stakeRupees)} • Est. Win:{' '}
-                      {formatRupees(bid.potentialWinRupees)}
+                      Stake: {formatRupees(stakeForItem(bid))} •{' '}
+                      {['SDT', 'CP', 'TDP'].includes(bid.gameCode)
+                        ? 'Win rate depends on the winning panna'
+                        : `Est. Win: ${formatRupees(bid.potentialWinRupees)}`}
                     </Text>
                   </View>
                   <IconButton
@@ -439,8 +466,8 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
         </View>
         <Button
           mode="contained"
-          disabled={totalBidsCount === 0}
-          onPress={handleSubmitAll}
+          disabled={totalBidsCount === 0 || submitting}
+          onPress={() => { void handleSubmitAll(); }}
           buttonColor={
             totalBidsCount > 0 ? APP_COLORS.accent : APP_COLORS.border
           }

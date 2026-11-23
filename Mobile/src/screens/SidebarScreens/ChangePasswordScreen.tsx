@@ -6,29 +6,38 @@ import { APP_COLORS } from '../../theme/paperTheme';
 
 interface ChangePasswordScreenProps {
   onSuccess: () => void;
+  onSubmit?: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({
   onSuccess,
+  onSubmit,
 }) => {
+  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [hidePassword, setHidePassword] = useState(true);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  const handleSubmit = (): void => {
-    if (password.length < 6) {
-      setErrorText('Password must be at least 6 characters.');
+  const handleSubmit = async (): Promise<void> => {
+    if (password.length < 8) {
+      setErrorText('Password must be at least 8 characters.');
       return;
     }
     if (password !== confirmPassword) {
       setErrorText('Passwords do not match.');
       return;
     }
-    setPassword('');
-    setConfirmPassword('');
-    setErrorText(null);
-    onSuccess();
+    try {
+      if (onSubmit) await onSubmit(currentPassword, password);
+      setCurrentPassword('');
+      setPassword('');
+      setConfirmPassword('');
+      setErrorText(null);
+      onSuccess();
+    } catch (error) {
+      setErrorText(error instanceof Error ? error.message : 'Unable to change password.');
+    }
   };
 
   return (
@@ -44,6 +53,14 @@ export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({
       <Text variant="titleMedium" style={styles.brandSub}>
         RoyalClubMatka Security
       </Text>
+
+      <FormInput
+        label="Current Password"
+        value={currentPassword}
+        onChangeText={setCurrentPassword}
+        secureTextEntry
+        containerStyle={styles.input}
+      />
 
       <FormInput
         label="New Password"
@@ -81,7 +98,7 @@ export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({
 
       <Button
         mode="contained"
-        onPress={handleSubmit}
+        onPress={() => { void handleSubmit(); }}
         buttonColor={APP_COLORS.accent}
         textColor={APP_COLORS.onAccent}
         style={styles.submitBtn}

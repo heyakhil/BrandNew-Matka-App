@@ -24,6 +24,7 @@ interface FundsScreenProps {
   onWithdrawFund: (amount: number) => void;
   onSaveBankDetails: (details: BankDetails) => void;
   onSupportPress: () => void;
+  live?: boolean;
 }
 
 interface FundsMenuItem {
@@ -83,6 +84,7 @@ export const FundsScreen: React.FC<FundsScreenProps> = ({
   onWithdrawFund,
   onSaveBankDetails,
   onSupportPress,
+  live = false,
 }) => {
   const depositTransactions = useMemo(
     () => transactions.filter(t => t.type === 'deposit'),
@@ -152,7 +154,7 @@ export const FundsScreen: React.FC<FundsScreenProps> = ({
           style={styles.container}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}>
-          {MENU_ITEMS.map(({ destination, ...item }) => (
+          {MENU_ITEMS.filter(item => !live || item.destination === 'depositHistory' || item.destination === 'withdrawHistory').map(({ destination, ...item }) => (
             <MenuListItem
               key={destination}
               {...item}

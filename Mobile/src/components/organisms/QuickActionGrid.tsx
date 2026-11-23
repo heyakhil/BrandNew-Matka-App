@@ -34,12 +34,14 @@ export const QuickActionGrid: React.FC<QuickActionGridProps> = ({
           key={action.label}
           label={action.label}
           onPress={action.onPress}
-          height={40}
-          fontSize={12}
+          height={42}
+          fontSize={10}
+          contentPadding={6}
+          style={styles.action}
           leading={
             <IconCircle
               icon={action.icon}
-              size={28}
+              size={22}
               backgroundColor={APP_COLORS.white}
               iconColor={APP_COLORS.gradientStart}
               borderColor={APP_COLORS.gradientStart}
@@ -58,5 +60,9 @@ const styles = StyleSheet.create({
     columnGap: 6,
     paddingHorizontal: 8,
     paddingTop: 8,
+  },
+  action: {
+    flex: 1,
+    minWidth: 0,
   },
 });

@@ -9,6 +9,9 @@ export const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 18,
   },
+  marketList: {
+    flex: 1,
+  },
   cards: {
     paddingHorizontal: 12,
   },

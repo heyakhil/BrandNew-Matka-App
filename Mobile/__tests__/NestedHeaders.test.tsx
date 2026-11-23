@@ -14,6 +14,7 @@ jest.mock('react-native-safe-area-context', () =>
   jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
 jest.mock('react-native-linear-gradient', () => 'LinearGradient');
+jest.mock('react-native-flash-message', () => ({ __esModule: true, default: 'FlashMessage', showMessage: jest.fn() }));
 
 describe('app navigation headers', () => {
   let renderer: ReactTestRenderer.ReactTestRenderer;
@@ -25,7 +26,7 @@ describe('app navigation headers', () => {
       return { remove: jest.fn() };
     });
     await ReactTestRenderer.act(() => {
-      renderer = ReactTestRenderer.create(<App />);
+      renderer = ReactTestRenderer.create(<App demo />);
     });
   });
 

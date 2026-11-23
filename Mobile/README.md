@@ -2,6 +2,25 @@ This is a new [**React Native**](https://reactnative.dev) project, bootstrapped 
 
 # Getting Started
 
+## Phone verification setup
+
+The Android application ID and iOS bundle identifier are `com.mataka.royaclub`. Registration and password reset use the server's Renflair four-digit SMS flow. For local USB testing, connect a phone with USB debugging enabled and run `npm run android:local` from `Mobile`. This starts the API and Metro if needed, forwards ports 4000 and 8081, installs the current debug app, and launches it. Run the command again after reconnecting the phone. A release APK requires a deployed HTTPS API address; `localhost` on a standalone phone does not reach the development computer.
+
+## Build a signed Android release APK
+
+Install Node.js 22.11+, JDK 17, and Android SDK platform/build tools 37.0.0 with NDK 27.1.12297006. Set `JAVA_HOME` and `ANDROID_HOME` to the JDK and SDK directories. From `Mobile` on Windows, run:
+
+```powershell
+npm ci
+.\scripts\setup-release-signing.ps1  # First build only
+cd android
+.\gradlew.bat assembleRelease
+```
+
+The signed APK is at `android/app/build/outputs/apk/release/app-release.apk`. Keep `android/app/release.keystore` and `android/release-signing.properties` in a secure backup. They are ignored by Git and required to sign future updates with the same key. If these files already exist, skip the setup script.
+
+The Android application ID is `com.mataka.royaclub`. Installing it alongside an older `com.tempapp` build creates a separate app with separate local data.
+
 > **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
 
 ## Step 1: Start Metro

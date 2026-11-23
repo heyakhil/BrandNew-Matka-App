@@ -7,7 +7,8 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { Button, Dialog, PaperProvider, Portal, Snackbar, Text } from 'react-native-paper';
+import { Button, Dialog, PaperProvider, Portal, Text } from 'react-native-paper';
+import FlashMessage from 'react-native-flash-message';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
@@ -57,6 +58,11 @@ import type {
   WalletTransaction,
 } from './src/types/matka';
 import { formatRupees } from './src/utils/matkaHelpers';
+import { loadAccount, saveProfile, submitBets } from './src/services/api';
+import { changePassword } from './src/services/api';
+import { toBetRequest } from './src/services/bets';
+import { LoginScreen } from './src/screens/LoginScreen';
+import { notifyError, notifySuccess, notifyWarning } from './src/services/flashMessage';
 
 const SIDEBAR_TITLES: Record<SidebarScreenKey, string> = {
   profile: 'Profile',
@@ -83,8 +89,11 @@ const FUNDS_TITLES: Record<FundsSubView, string> = {
   withdrawHistory: 'Fund Withdraw History',
 };
 
-function AppShell(): React.JSX.Element {
+interface MobileSession { token: string }
+
+export function AppShell({ session = null, onLogout, onTokenChange }: { session?: MobileSession | null; onLogout?: () => void; onTokenChange?: (token: string) => void }): React.JSX.Element {
   const insets = useSafeAreaInsets();
+  const live = session !== null;
 
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [sidebarScreen, setSidebarScreen] = useState<SidebarScreenKey | null>(
@@ -98,13 +107,15 @@ function AppShell(): React.JSX.Element {
 
   const [profile, setProfile] = useState<UserProfile>({
     name: 'Royal Club Member',
-    phone: '9172264511',
-    email: 'member@royalclubmatka.com',
+    phone: '',
+    email: '',
   });
-  const [balanceRupees, setBalanceRupees] = useState(1000);
+  const [balanceRupees, setBalanceRupees] = useState(live ? 0 : 1000);
+  const [referralCode, setReferralCode] = useState('');
+  const [markets, setMarkets] = useState<MarketItem[]>(live ? [] : INITIAL_MARKETS);
   const [bids, setBids] = useState<BidRecord[]>([]);
   const [transactions, setTransactions] =
-    useState<WalletTransaction[]>(INITIAL_TRANSACTIONS);
+    useState<WalletTransaction[]>(live ? [] : INITIAL_TRANSACTIONS);
   const [bankDetails, setBankDetails] = useState<BankDetails>({
     accountHolder: '',
     bankName: '',
@@ -118,7 +129,23 @@ function AppShell(): React.JSX.Element {
     null,
   );
   const [chartMarket, setChartMarket] = useState<MarketItem | null>(null);
-  const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
+
+  const refreshAccount = useCallback(async (): Promise<void> => {
+    if (!session) return;
+    try {
+      const account = await loadAccount(session.token);
+      setMarkets(account.markets);
+      setBids(account.bids);
+      setTransactions(account.transactions);
+      setBalanceRupees(account.balanceRupees);
+      setReferralCode(account.referralCode);
+      setProfile(account.profile);
+    } catch (error) {
+      notifyError(error instanceof Error ? error.message : 'Unable to refresh account.');
+    }
+  }, [session]);
+
+  useEffect(() => { void refreshAccount(); }, [refreshAccount]);
 
   const handleBack = useCallback((): boolean => {
     if (logoutDialogOpen) {
@@ -207,7 +234,7 @@ function AppShell(): React.JSX.Element {
         }
         await Linking.openURL(fallbackUrl);
       } catch {
-        setSnackbarMessage(errorMessage);
+        notifyError(errorMessage);
       }
     }
   };
@@ -225,11 +252,12 @@ function AppShell(): React.JSX.Element {
   const handleShareApp = async (): Promise<void> => {
     try {
       await Share.share({
-        message:
-          'Play Matka on RoyalClubMatka! Fast results, full rates & 24x7 support.',
+        message: referralCode
+          ? `Join me on Royal Club Matka. Use my invite code: ${referralCode}`
+          : 'Join me on Royal Club Matka.',
       });
     } catch {
-      setSnackbarMessage('Unable to open share sheet.');
+      notifyError('Unable to open share sheet.');
     }
   };
 
@@ -249,8 +277,20 @@ function AppShell(): React.JSX.Element {
     setActiveTab(key);
   };
 
-  const handlePlaceBets = (items: SubmittedBidItem[]): void => {
+  const handlePlaceBets = async (items: SubmittedBidItem[], requestId: string): Promise<void> => {
     if (!selectedMarket || items.length === 0) {
+      return;
+    }
+    if (session) {
+      try {
+        const requests = items.map(toBetRequest);
+        await submitBets(session.token, selectedMarket.id, requests, requestId);
+        await refreshAccount();
+        setSelectedGame(null);
+        notifySuccess(`${items.length} bid${items.length === 1 ? '' : 's'} placed.`);
+      } catch (error) {
+        notifyError(error instanceof Error ? error.message : 'Unable to place bets.');
+      }
       return;
     }
     const totalStake = items.reduce((sum, item) => sum + item.stakeRupees, 0);
@@ -291,7 +331,7 @@ function AppShell(): React.JSX.Element {
     setBids(prev => [...newBids, ...prev]);
     setTransactions(prev => [newTx, ...prev]);
     setSelectedGame(null);
-    setSnackbarMessage(
+    notifySuccess(
       `${items.length} bid${items.length > 1 ? 's' : ''} placed (${formatRupees(
         totalStake,
       )})`,
@@ -299,6 +339,7 @@ function AppShell(): React.JSX.Element {
   };
 
   const handleAddFund = (amount: number): void => {
+    if (live) { notifyWarning('Contact support to add funds.'); return; }
     setBalanceRupees(prev => prev + amount);
     setTransactions(prev => [
       {
@@ -313,10 +354,11 @@ function AppShell(): React.JSX.Element {
       },
       ...prev,
     ]);
-    setSnackbarMessage(`Added ${formatRupees(amount)} to wallet.`);
+    notifySuccess(`Added ${formatRupees(amount)} to wallet.`);
   };
 
   const handleWithdrawFund = (amount: number): void => {
+    if (live) { notifyWarning('Contact support for withdrawals.'); return; }
     setBalanceRupees(prev => prev - amount);
     setTransactions(prev => [
       {
@@ -331,12 +373,12 @@ function AppShell(): React.JSX.Element {
       },
       ...prev,
     ]);
-    setSnackbarMessage(`Withdrawal of ${formatRupees(amount)} requested.`);
+    notifySuccess(`Withdrawal of ${formatRupees(amount)} requested.`);
   };
 
   const handleSaveBankDetails = (details: BankDetails): void => {
     setBankDetails(details);
-    setSnackbarMessage('Payment details saved.');
+    notifySuccess('Payment details saved.');
   };
 
   const hasOwnHeader =
@@ -350,9 +392,12 @@ function AppShell(): React.JSX.Element {
         return (
           <ProfileScreen
             profile={profile}
-            onUpdateProfile={next => {
-              setProfile(next);
-              setSnackbarMessage('Profile updated successfully.');
+            emailReadOnly={live}
+            onUpdateProfile={async next => {
+              try {
+                setProfile(session ? await saveProfile(session.token, next) : next);
+                notifySuccess('Profile updated successfully.');
+              } catch (error) { throw error; }
             }}
           />
         );
@@ -361,11 +406,11 @@ function AppShell(): React.JSX.Element {
       case 'gameRates':
         return <GameRatesScreen />;
       case 'gameTiming':
-        return <GameTimingScreen markets={INITIAL_MARKETS} />;
+        return <GameTimingScreen markets={markets} />;
       case 'gameChart':
         return (
           <GameChartScreen
-            markets={INITIAL_MARKETS}
+            markets={markets}
             selectedChart={selectedChart}
             onSelectChart={setSelectedChart}
           />
@@ -373,9 +418,13 @@ function AppShell(): React.JSX.Element {
       case 'changePassword':
         return (
           <ChangePasswordScreen
+            onSubmit={session ? async (current, next) => {
+              try { onTokenChange?.(await changePassword(session.token, current, next)); }
+              catch (error) { throw error; }
+            } : undefined}
             onSuccess={() => {
               setSidebarScreen(null);
-              setSnackbarMessage('Password changed successfully.');
+              notifySuccess('Password changed successfully.');
             }}
           />
         );
@@ -391,7 +440,7 @@ function AppShell(): React.JSX.Element {
       case 'gameResults':
         return (
           <GameResultScreen
-            markets={INITIAL_MARKETS}
+            markets={markets}
             onSelectMarket={market => setChartMarket(market)}
           />
         );
@@ -399,7 +448,7 @@ function AppShell(): React.JSX.Element {
         return (
           <MyBidsScreen
             onSelect={setBidsSubView}
-            onUnavailable={title => setSnackbarMessage(`${title} is coming soon.`)}
+            onUnavailable={title => notifyWarning(`${title} is coming soon.`)}
           />
         );
     }
@@ -432,12 +481,12 @@ function AppShell(): React.JSX.Element {
       case 'home':
         return (
           <HomeScreen
-            markets={INITIAL_MARKETS}
+            markets={markets}
             onPlaceBet={market => setSelectedMarket(market)}
             onOpenChart={market => setChartMarket(market)}
             onOpenRates={() => setSidebarScreen('gameRates')}
-            onAddFunds={() => openFunds('addFund')}
-            onWithdraw={() => openFunds('withdraw')}
+            onAddFunds={() => live ? void handleOpenWhatsApp() : openFunds('addFund')}
+            onWithdraw={() => live ? void handleOpenWhatsApp() : openFunds('withdraw')}
             onInvite={() => {
               handleShareApp();
             }}
@@ -468,6 +517,7 @@ function AppShell(): React.JSX.Element {
             onSupportPress={() => {
               handleOpenWhatsApp();
             }}
+            live={live}
           />
         );
     }
@@ -485,7 +535,7 @@ function AppShell(): React.JSX.Element {
             balanceRupees={balanceRupees}
             onMenuPress={() => setDrawerOpen(true)}
             onWalletPress={() => openFunds('menu')}
-            onRefreshPress={() => setSnackbarMessage('Balance refreshed.')}
+            onRefreshPress={() => { void refreshAccount(); }}
           />
         ) : (
           <ScreenHeader
@@ -523,10 +573,6 @@ function AppShell(): React.JSX.Element {
         visible={Boolean(chartMarket)}
         market={chartMarket}
         onDismiss={() => setChartMarket(null)}
-        onPlaceBet={market => {
-          setSelectedGame(null);
-          setSelectedMarket(market);
-        }}
       />
 
       <Portal>
@@ -554,7 +600,8 @@ function AppShell(): React.JSX.Element {
                 setLogoutDialogOpen(false);
                 resetNavigation();
                 setActiveTab('home');
-                setSnackbarMessage('Logged out successfully.');
+                onLogout?.();
+                notifySuccess('Logged out successfully.');
               }}>
               Logout
             </Button>
@@ -562,23 +609,22 @@ function AppShell(): React.JSX.Element {
         </Dialog>
       </Portal>
 
-      <Snackbar
-        visible={Boolean(snackbarMessage)}
-        onDismiss={() => setSnackbarMessage(null)}
-        duration={2500}
-        style={styles.snackbar}>
-        {snackbarMessage ?? ''}
-      </Snackbar>
     </View>
   );
 }
 
-function App(): React.JSX.Element {
+function App({ demo = false }: { demo?: boolean }): React.JSX.Element {
+  const [session, setSession] = useState<MobileSession | null>(null);
   return (
     <SafeAreaProvider>
       <PaperProvider theme={royalMatkaTheme}>
         <StatusBar barStyle="dark-content" />
-        <AppShell />
+        {session || demo ? (
+          <AppShell session={session} onLogout={() => setSession(null)} onTokenChange={token => setSession(previous => previous ? { ...previous, token } : null)} />
+        ) : (
+          <LoginScreen onAuthenticated={token => setSession({ token })} />
+        )}
+        <FlashMessage position="top" />
       </PaperProvider>
     </SafeAreaProvider>
   );
@@ -602,9 +648,6 @@ const styles = StyleSheet.create({
   },
   dialogBody: {
     color: APP_COLORS.textSecondary,
-  },
-  snackbar: {
-    backgroundColor: APP_COLORS.dark,
   },
 });
 

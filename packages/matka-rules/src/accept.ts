@@ -21,7 +21,7 @@ import {
   type Slip,
 } from './expand';
 import { normalizePanna } from './panna';
-import { assertStakePaise, rateFor, type Rate, type RateCard, type StakeLimits } from './rates';
+import { assertStakePaise, rateFor, winningPaise, type Rate, type RateCard, type StakeLimits } from './rates';
 import { rateKeyForSlip, type RateKey } from './settle';
 
 export type BettingPhase = 'preOpen' | 'afterOpenCutoff' | 'closed' | 'cancelled';
@@ -245,11 +245,13 @@ function expandRequest(request: BetRequest): readonly Slip[] {
 function priceSlips(slips: readonly Slip[], card: RateCard): PricedSlip[] {
   return slips.map((slip) => {
     const rateKey = rateKeyForSlip(slip);
+    const lockedRate = rateFor(card, rateKey);
+    winningPaise(slip.stake, lockedRate);
     return {
       slip,
       stakePaise: slip.stake,
       rateKey,
-      lockedRate: rateFor(card, rateKey),
+      lockedRate,
     };
   });
 }
@@ -265,5 +267,8 @@ export function acceptBet(
   const slips = expandRequest(request);
   const priced = priceSlips(slips, rateCard);
   const totalStakePaise = priced.reduce((total, slip) => total + slip.stakePaise, 0);
+  if (!Number.isSafeInteger(totalStakePaise)) {
+    throw new MatkaRulesError('Total stake exceeds the safe calculation limit.');
+  }
   return { slips: priced, totalStakePaise };
 }

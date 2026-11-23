@@ -21,7 +21,7 @@ export const MarketGamesScreen: React.FC<MarketGamesScreenProps> = ({
     if (market.category === 'jackpot') {
       return MARKET_GAME_OPTIONS.filter(g => ['JD', 'JDB', 'RB'].includes(g.id));
     }
-    return MARKET_GAME_OPTIONS;
+    return MARKET_GAME_OPTIONS.filter(g => !['DBJ', 'PG'].includes(g.id));
   }, [market.category]);
 
   return (
@@ -38,7 +38,7 @@ export const MarketGamesScreen: React.FC<MarketGamesScreenProps> = ({
         contentContainerStyle={styles.gridContent}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => {
-          const disabled = isCloseOnly && item.openOnly;
+          const disabled = isCloseOnly && ['HS', 'FS'].includes(item.id);
           return (
             <Card
               style={[styles.card, disabled && styles.cardDisabled]}

@@ -46,8 +46,8 @@ export const MarketCard: React.FC<MarketCardProps> = ({
         </Text>
         <Text style={styles.result}>{market.resultLine}</Text>
         <View style={styles.timings}>
-          <BidTime label="Open Bids" value={market.openTime} />
-          <BidTime label="Close Bids" value={market.closeTime} />
+          <BidTime label="Open Bids" value={market.openBidLastTime ?? market.openTime} />
+          <BidTime label="Close Bids" value={market.closeBidLastTime ?? market.closeTime} />
         </View>
       </View>
 
@@ -55,10 +55,10 @@ export const MarketCard: React.FC<MarketCardProps> = ({
         <StatusBadge status={market.status} />
         <GradientCircle
           size={54}
-          disabled={isClosed}
+          muted={isClosed}
           onPress={() => onPlaceBet(market)}
           accessibilityLabel={`Play ${market.name}`}>
-          <Icon source="play" size={36} color={APP_COLORS.white} />
+          <Icon source={isClosed ? 'lock-outline' : 'play'} size={36} color={APP_COLORS.white} />
         </GradientCircle>
         <Text style={styles.playLabel}>Play Game</Text>
       </View>

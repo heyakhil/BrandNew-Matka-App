@@ -7,12 +7,14 @@ import type { UserProfile } from '../../types/matka';
 
 interface ProfileScreenProps {
   profile: UserProfile;
-  onUpdateProfile: (next: UserProfile) => void;
+  onUpdateProfile: (next: UserProfile) => Promise<void> | void;
+  emailReadOnly?: boolean;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   profile,
   onUpdateProfile,
+  emailReadOnly = false,
 }) => {
   const [name, setName] = useState(profile.name);
   const [phone, setPhone] = useState(profile.phone);
@@ -26,17 +28,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     .map(w => w[0]?.toUpperCase() ?? '')
     .join('') || 'RC';
 
-  const handleSave = (): void => {
+  const handleSave = async (): Promise<void> => {
     if (!name.trim() || phone.trim().length < 10) {
       setErrorText('Enter a valid name and 10-digit contact number.');
       return;
     }
-    onUpdateProfile({
-      name: name.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-    });
-    setErrorText(null);
+    try {
+      await onUpdateProfile({ name: name.trim(), phone: phone.trim(), email: email.trim() });
+      setErrorText(null);
+    } catch (error) {
+      setErrorText(error instanceof Error ? error.message : 'Unable to update profile.');
+    }
   };
 
   return (
@@ -83,6 +85,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             label="Email Address"
             value={email}
             onChangeText={setEmail}
+            disabled={emailReadOnly}
             keyboardType="email-address"
             containerStyle={styles.input}
           />
@@ -95,7 +98,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
           <Button
             mode="contained"
-            onPress={handleSave}
+            onPress={() => { void handleSave(); }}
             buttonColor={APP_COLORS.accent}
             textColor={APP_COLORS.onAccent}
             style={styles.saveBtn}

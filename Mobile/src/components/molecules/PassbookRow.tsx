@@ -11,40 +11,45 @@ interface PassbookRowProps {
 
 export const PassbookRow: React.FC<PassbookRowProps> = ({ transaction }) => {
   const [expanded, setExpanded] = useState(false);
-  const { timestamp, title, amountRupees, beforeBalance, afterBalance, status } =
-    transaction;
+  const { amountRupees, beforeBalance, afterBalance } = transaction;
+  const isCredit = transaction.type === 'deposit' || transaction.type === 'win';
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ expanded }}
-      onPress={() => setExpanded(prev => !prev)}
-      style={styles.card}>
+      onPress={() => setExpanded(previous => !previous)}
+      style={styles.card}
+    >
       <View style={styles.row}>
-        <View style={styles.dateCol}>
-          <Text style={styles.text}>{timestamp}</Text>
+        <View style={styles.cell}>
+          <Text style={styles.value}>
+            {beforeBalance === undefined ? '—' : formatRupees(beforeBalance)}
+          </Text>
         </View>
-        <View style={styles.particularsCol}>
-          <Text style={[styles.text, styles.particulars]}>{title}</Text>
+        <View style={styles.cell}>
+          <Text style={[styles.value, isCredit ? styles.credit : styles.debit]}>
+            {isCredit ? '+ ' : '- '}
+            {formatRupees(amountRupees)}
+          </Text>
+        </View>
+        <View style={styles.cell}>
+          <Text style={styles.value}>
+            {afterBalance === undefined ? '—' : formatRupees(afterBalance)}
+          </Text>
           <Icon
             source={expanded ? 'chevron-up' : 'chevron-down'}
-            size={22}
+            size={17}
             color={APP_COLORS.accent}
           />
         </View>
       </View>
-
       {expanded && (
         <View style={styles.details}>
           <Text style={styles.detail}>
-            Amount: {formatRupees(amountRupees)} • {status}
+            {transaction.title} · {transaction.status}
           </Text>
-          {beforeBalance !== undefined && afterBalance !== undefined && (
-            <Text style={styles.detail}>
-              Balance: {formatRupees(beforeBalance)} →{' '}
-              {formatRupees(afterBalance)}
-            </Text>
-          )}
+          <Text style={styles.detail}>{transaction.timestamp}</Text>
         </View>
       )}
     </Pressable>
@@ -53,50 +58,31 @@ export const PassbookRow: React.FC<PassbookRowProps> = ({ transaction }) => {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: APP_COLORS.secondary,
+    backgroundColor: APP_COLORS.white,
     borderRadius: 8,
     marginBottom: 8,
     elevation: 2,
-    shadowColor: APP_COLORS.dark,
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
+    overflow: 'hidden',
   },
-  row: {
+  row: { flexDirection: 'row', minHeight: 64 },
+  cell: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
-    minHeight: 64,
-  },
-  dateCol: {
-    width: '30%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 6,
-    borderRightWidth: 1,
+    borderRightWidth: StyleSheet.hairlineWidth,
     borderRightColor: APP_COLORS.border,
+    paddingHorizontal: 2,
   },
-  particularsCol: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 14,
-    paddingRight: 4,
-  },
-  particulars: {
-    flex: 1,
-    textAlign: 'left',
-  },
-  text: {
+  value: {
     color: APP_COLORS.textPrimary,
-    fontSize: 14,
+    fontSize: 12,
     textAlign: 'center',
+    flexShrink: 1,
   },
-  details: {
-    paddingHorizontal: 14,
-    paddingBottom: 12,
-    gap: 2,
-  },
-  detail: {
-    color: APP_COLORS.textSecondary,
-    fontSize: 13,
-  },
+  credit: { color: APP_COLORS.success },
+  debit: { color: APP_COLORS.danger },
+  details: { paddingHorizontal: 12, paddingBottom: 10 },
+  detail: { color: APP_COLORS.textSecondary, fontSize: 12 },
 });

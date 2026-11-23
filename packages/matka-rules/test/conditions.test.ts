@@ -10,6 +10,7 @@ import {
   refundUnsettled,
   reverseDeclaration,
   rupeesToPaise,
+  winningPaise,
   type BetRequest,
   type RateCard,
 } from '../src/index';
@@ -26,6 +27,21 @@ const CARD: RateCard = {
 
 const HUNDRED = rupeesToPaise(100);
 const TEN = rupeesToPaise(10);
+
+it('rejects a payout beyond JavaScript safe integers', () => {
+  assert.throws(
+    () => winningPaise(Number.MAX_SAFE_INTEGER, { numerator: 2, denominator: 1 }),
+    /safe calculation limit/,
+  );
+});
+
+it('rejects a stake whose locked rate could produce fractional paise', () => {
+  const card: RateCard = { ...CARD, single: { numerator: 1, denominator: 3 } };
+  assert.throws(
+    () => acceptBet('preOpen', { game: 'single', side: 'open', ank: 0, stakePaise: 1000 }, card, DEFAULT_STAKE_LIMITS),
+    /whole number of paise/,
+  );
+});
 
 function accept(request: BetRequest) {
   return acceptBet('preOpen', request, CARD, DEFAULT_STAKE_LIMITS);

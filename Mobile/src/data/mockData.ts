@@ -405,7 +405,7 @@ export const MARKET_GAME_OPTIONS: MarketGameOption[] = [
   },
   {
     id: 'GJ',
-    title: 'Group Jodi',
+    title: 'Jodi Family',
     icon: 'grid-large',
     color: '#FACC15',
     openOnly: true,
@@ -432,7 +432,7 @@ export const MARKET_GAME_OPTIONS: MarketGameOption[] = [
   },
   {
     id: 'RB',
-    title: 'Red Bracket',
+    title: 'Red Jodi',
     icon: 'code-braces',
     color: APP_COLORS.danger,
     openOnly: true,
@@ -450,7 +450,7 @@ export const MARKET_GAME_OPTIONS: MarketGameOption[] = [
   },
   {
     id: 'CP',
-    title: 'Choice Pana',
+    title: 'Panna Family',
     icon: 'cards-playing-heart-outline',
     color: '#2563EB',
     openOnly: false,
@@ -468,7 +468,7 @@ export const MARKET_GAME_OPTIONS: MarketGameOption[] = [
   },
   {
     id: 'TDP',
-    title: 'Two Digit Panel (CP,SR)',
+    title: 'Cycle Patti',
     icon: 'dice-2',
     color: '#7C3AED',
     openOnly: false,

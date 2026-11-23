@@ -29,7 +29,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
     />
     <Image source={logo} style={styles.logo} accessibilityIgnoresInvertColors />
     <Text numberOfLines={1} style={styles.brand}>
-      ROYAL CLUB
+      ROYAL CLUB PRO
     </Text>
     <BalanceChip balanceRupees={balanceRupees} onPress={onWalletPress} />
     <IconButton
@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   brand: {
     flex: 1,
     color: APP_COLORS.textPrimary,
-    fontSize: 17,
+    fontSize: 15,
     lineHeight: 21,
     marginLeft: 8,
   },

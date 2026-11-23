@@ -70,8 +70,12 @@ export interface MarketItem {
   resultLine: string;
   openTime: string;
   closeTime: string;
+  openBidLastTime?: string;
+  closeBidLastTime?: string;
   status: MarketStatus;
   category: MarketCategory;
+  rateCard?: Record<'single' | 'jodi' | 'sp' | 'dp' | 'tp' | 'halfSangam' | 'fullSangam', { numerator: number; denominator: number }>;
+  limits?: { minPaise: number; maxPaise: number };
   recentChart: Array<{
     date: string;
     result: string;
@@ -101,7 +105,7 @@ export interface BidRecord {
   potentialWinRupees: number;
   dateLabel: string;
   timeLabel: string;
-  status: 'Pending' | 'Won' | 'Lost';
+  status: 'Pending' | 'Won' | 'Lost' | 'Refunded';
 }
 
 export interface WalletTransaction {

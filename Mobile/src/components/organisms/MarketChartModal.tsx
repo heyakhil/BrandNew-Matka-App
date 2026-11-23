@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
   Button,
@@ -17,15 +17,14 @@ interface MarketChartModalProps {
   visible: boolean;
   market: MarketItem | null;
   onDismiss: () => void;
-  onPlaceBet: (market: MarketItem) => void;
 }
 
 export const MarketChartModal: React.FC<MarketChartModalProps> = ({
   visible,
   market,
   onDismiss,
-  onPlaceBet,
 }) => {
+  const [mode, setMode] = useState<'Jodi' | 'Panna'>('Jodi');
   if (!market) {
     return null;
   }
@@ -40,7 +39,7 @@ export const MarketChartModal: React.FC<MarketChartModalProps> = ({
           <View style={styles.header}>
             <View>
               <Text variant="titleMedium" style={styles.title}>
-                {market.name} Chart
+                {market.name} {mode} Chart
               </Text>
               <Text variant="labelSmall" style={styles.sub}>
                 Open {market.openTime} • Close {market.closeTime}
@@ -58,7 +57,7 @@ export const MarketChartModal: React.FC<MarketChartModalProps> = ({
             <DataTable.Header style={styles.tableHeader}>
               <DataTable.Title textStyle={styles.colHead}>Date</DataTable.Title>
               <DataTable.Title numeric textStyle={styles.colHead}>
-                Result Line
+                {mode}
               </DataTable.Title>
             </DataTable.Header>
 
@@ -68,7 +67,7 @@ export const MarketChartModal: React.FC<MarketChartModalProps> = ({
                   {row.date}
                 </DataTable.Cell>
                 <DataTable.Cell numeric textStyle={styles.resultText}>
-                  {row.result}
+                  {mode === 'Jodi' ? (row.result.split('-')[1] ?? '—') : `${row.result.split('-')[0] ?? '—'} / ${row.result.split('-')[2] ?? '—'}`}
                 </DataTable.Cell>
               </DataTable.Row>
             ))}
@@ -77,16 +76,13 @@ export const MarketChartModal: React.FC<MarketChartModalProps> = ({
           <View style={styles.footer}>
             <Button
               mode="contained"
-              disabled={market.status === 'closed'}
-              onPress={() => {
-                onDismiss();
-                onPlaceBet(market);
-              }}
+              onPress={() => setMode('Jodi')}
               buttonColor={APP_COLORS.accent}
               textColor={APP_COLORS.onAccent}
               labelStyle={styles.btnLabel}>
-              {market.status === 'closed' ? 'Market Closed' : 'Place Bet'}
+              Jodi Chart
             </Button>
+            <Button mode="outlined" onPress={() => setMode('Panna')} textColor={APP_COLORS.gradientStart}>Panna Chart</Button>
           </View>
         </Surface>
       </Modal>
@@ -142,6 +138,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 16,
+    gap: 8,
   },
   btnLabel: {
     fontWeight: '800',

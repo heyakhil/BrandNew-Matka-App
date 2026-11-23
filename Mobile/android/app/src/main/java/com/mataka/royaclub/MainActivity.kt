@@ -1,4 +1,4 @@
-package com.tempapp
+package com.mataka.royaclub
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

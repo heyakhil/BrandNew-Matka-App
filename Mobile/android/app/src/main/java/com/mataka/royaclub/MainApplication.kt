@@ -1,4 +1,4 @@
-package com.tempapp
+package com.mataka.royaclub
 
 import android.app.Application
 import com.facebook.react.PackageList

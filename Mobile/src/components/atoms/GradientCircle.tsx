@@ -8,6 +8,7 @@ interface GradientCircleProps {
   children: React.ReactNode;
   onPress?: () => void;
   disabled?: boolean;
+  muted?: boolean;
   accessibilityLabel?: string;
 }
 
@@ -16,6 +17,7 @@ export const GradientCircle: React.FC<GradientCircleProps> = ({
   children,
   onPress,
   disabled = false,
+  muted = false,
   accessibilityLabel,
 }) => (
   <Pressable
@@ -23,7 +25,7 @@ export const GradientCircle: React.FC<GradientCircleProps> = ({
     accessibilityLabel={accessibilityLabel}
     disabled={disabled || !onPress}
     onPress={onPress}
-    style={disabled ? styles.disabled : undefined}>
+    style={disabled || muted ? styles.disabled : undefined}>
     <LinearGradient
       colors={BRAND_GRADIENT}
       start={{ x: 0.5, y: 0 }}

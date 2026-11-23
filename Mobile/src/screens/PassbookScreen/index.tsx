@@ -29,12 +29,9 @@ export const PassbookScreen: React.FC<PassbookScreenProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.tableHeader}>
-        <Text style={[styles.headerText, styles.dateHeader]}>
-          Transaction Date
-        </Text>
-        <Text style={[styles.headerText, styles.particularsHeader]}>
-          Particulars
-        </Text>
+        <Text style={styles.headerText}>Previous Amount</Text>
+        <Text style={styles.headerText}>Transaction Amount</Text>
+        <Text style={styles.headerText}>Current Amount</Text>
       </View>
 
       <FlatList
@@ -81,19 +78,12 @@ const styles = StyleSheet.create({
     height: 48,
   },
   headerText: {
-    color: APP_COLORS.textPrimary,
-    fontSize: 14,
-    textAlignVertical: 'center',
-  },
-  dateHeader: {
-    width: '30%',
-    textAlign: 'center',
-    borderRightWidth: 2,
-    borderRightColor: APP_COLORS.white,
-  },
-  particularsHeader: {
     flex: 1,
-    paddingLeft: 14,
+    color: APP_COLORS.textPrimary,
+    fontSize: 11,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    paddingHorizontal: 2,
   },
   list: {
     paddingHorizontal: 6,
