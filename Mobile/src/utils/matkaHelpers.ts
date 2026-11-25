@@ -43,6 +43,44 @@ export function isRedJodiPair(jodi: string): boolean {
   return a === b || (a + 5) % 10 === b;
 }
 
+/** Generate all canonical 3-digit SP or DP pannas whose ank sum % 10 equals `ank`. */
+export function getPannasForAnk(ank: number, kind: 'SP' | 'DP'): string[] {
+  if (!Number.isInteger(ank) || ank < 0 || ank > 9) {
+    return [];
+  }
+  const results = new Set<string>();
+  const digits = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+
+  if (kind === 'SP') {
+    for (let i = 0; i < digits.length; i += 1) {
+      for (let j = i + 1; j < digits.length; j += 1) {
+        for (let k = j + 1; k < digits.length; k += 1) {
+          const d1 = digits[i];
+          const d2 = digits[j];
+          const d3 = digits[k];
+          if ((d1 + d2 + d3) % 10 === ank) {
+            results.add(`${d1}${d2}${d3}`);
+          }
+        }
+      }
+    }
+  } else {
+    for (const repeat of digits) {
+      for (const other of digits) {
+        if (other === repeat) continue;
+        if ((repeat + repeat + other) % 10 === ank) {
+          const sorted = [repeat, repeat, other].sort(
+            (a, b) => DIGIT_ORDER(a) - DIGIT_ORDER(b),
+          );
+          results.add(sorted.join(''));
+        }
+      }
+    }
+  }
+
+  return Array.from(results).sort();
+}
+
 export interface BetValidationResult {
   valid: boolean;
   formattedNumber: string;

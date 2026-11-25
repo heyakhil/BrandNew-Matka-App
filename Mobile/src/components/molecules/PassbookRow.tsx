@@ -9,6 +9,14 @@ interface PassbookRowProps {
   transaction: WalletTransaction;
 }
 
+export const PASSBOOK_COLUMN_WIDTHS = {
+  date: 105,
+  particulars: 250,
+  previous: 120,
+  amount: 135,
+  current: 120,
+} as const;
+
 export const PassbookRow: React.FC<PassbookRowProps> = ({ transaction }) => {
   const [expanded, setExpanded] = useState(false);
   const { amountRupees, beforeBalance, afterBalance } = transaction;
@@ -22,20 +30,14 @@ export const PassbookRow: React.FC<PassbookRowProps> = ({ transaction }) => {
       style={styles.card}
     >
       <View style={styles.row}>
-        <View style={styles.cell}>
-          <Text style={styles.value}>
-            {beforeBalance === undefined ? '—' : formatRupees(beforeBalance)}
+        <View style={[styles.cell, { width: PASSBOOK_COLUMN_WIDTHS.date }]}>
+          <Text style={styles.value} numberOfLines={2}>
+            {transaction.timestamp}
           </Text>
         </View>
-        <View style={styles.cell}>
-          <Text style={[styles.value, isCredit ? styles.credit : styles.debit]}>
-            {isCredit ? '+ ' : '- '}
-            {formatRupees(amountRupees)}
-          </Text>
-        </View>
-        <View style={styles.cell}>
-          <Text style={styles.value}>
-            {afterBalance === undefined ? '—' : formatRupees(afterBalance)}
+        <View style={[styles.cell, styles.particularsCell, { width: PASSBOOK_COLUMN_WIDTHS.particulars }]}>
+          <Text style={styles.particularsText} numberOfLines={expanded ? undefined : 2}>
+            {transaction.title}
           </Text>
           <Icon
             source={expanded ? 'chevron-up' : 'chevron-down'}
@@ -43,13 +45,28 @@ export const PassbookRow: React.FC<PassbookRowProps> = ({ transaction }) => {
             color={APP_COLORS.accent}
           />
         </View>
+        <View style={[styles.cell, { width: PASSBOOK_COLUMN_WIDTHS.previous }]}>
+          <Text style={styles.value}>
+            {beforeBalance === undefined ? '—' : formatRupees(beforeBalance)}
+          </Text>
+        </View>
+        <View style={[styles.cell, { width: PASSBOOK_COLUMN_WIDTHS.amount }]}>
+          <Text style={[styles.value, isCredit ? styles.credit : styles.debit]}>
+            {isCredit ? '+ ' : '- '}
+            {formatRupees(amountRupees)}
+          </Text>
+        </View>
+        <View style={[styles.cell, styles.lastCell, { width: PASSBOOK_COLUMN_WIDTHS.current }]}>
+          <Text style={styles.value}>
+            {afterBalance === undefined ? '—' : formatRupees(afterBalance)}
+          </Text>
+        </View>
       </View>
       {expanded && (
         <View style={styles.details}>
           <Text style={styles.detail}>
-            {transaction.title} · {transaction.status}
+            Status: {transaction.status} · {transaction.timestamp}
           </Text>
-          <Text style={styles.detail}>{transaction.timestamp}</Text>
         </View>
       )}
     </Pressable>
@@ -66,14 +83,27 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', minHeight: 64 },
   cell: {
-    flex: 1,
-    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     borderRightWidth: StyleSheet.hairlineWidth,
     borderRightColor: APP_COLORS.border,
-    paddingHorizontal: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  particularsCell: {
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  particularsText: {
+    flex: 1,
+    color: APP_COLORS.textPrimary,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'left',
+  },
+  lastCell: {
+    borderRightWidth: 0,
   },
   value: {
     color: APP_COLORS.textPrimary,

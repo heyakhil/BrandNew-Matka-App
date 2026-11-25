@@ -7,6 +7,8 @@ import {
 import { client, connectDatabase } from "../src/db.ts";
 
 const markets = [
+  ["test-bazar-open", "TEST BAZAR (OPEN)", "23:45", "23:55"],
+  ["test-bazar-night", "TEST BAZAR NIGHT", "23:50", "23:59"],
   ["anmol-morning", "ANMOL MORNING", "10:20", "12:00"],
   ["sita-morning", "SITA MORNING", "10:30", "12:15"],
   ["sridevi", "SRIDEVI", "11:35", "12:35"],

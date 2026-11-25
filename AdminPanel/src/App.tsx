@@ -459,6 +459,14 @@ function UsersView({
   onError: (cause: unknown) => void;
   onDetails: (userId: string) => void;
 }) {
+  const [walletAction, setWalletAction] = useState<{
+    user: User;
+    mode: "add" | "deduct";
+  } | null>(null);
+  const [walletAmount, setWalletAmount] = useState("");
+  const [walletReference, setWalletReference] = useState("");
+  const [walletSaving, setWalletSaving] = useState(false);
+
   async function toggle(user: User): Promise<void> {
     try {
       await api(`/admin/users/${user._id}`, {
@@ -470,28 +478,41 @@ function UsersView({
       onError(cause);
     }
   }
-  async function adjust(user: User): Promise<void> {
-    const amount = window.prompt(
-      "Adjustment in rupees. Use a negative number to debit."
-    );
-    if (amount === null) return;
-    const rupees = Number(amount);
-    if (!Number.isSafeInteger(rupees) || rupees === 0) {
-      onError(new Error("Enter a nonzero whole rupee amount."));
+
+  function openWalletModal(user: User, mode: "add" | "deduct"): void {
+    setWalletAction({ user, mode });
+    setWalletAmount("");
+    setWalletReference("");
+  }
+
+  async function submitWalletChange(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    if (!walletAction) return;
+    const rupeesAmount = Number(walletAmount);
+    if (!Number.isSafeInteger(rupeesAmount) || rupeesAmount <= 0) {
+      onError(new Error("Enter a positive whole rupee amount."));
       return;
     }
-    const referenceId = window.prompt(
-      "Enter the payment or adjustment reference."
-    );
-    if (!referenceId) return;
+    const referenceId = walletReference.trim();
+    if (!referenceId) {
+      onError(new Error("Enter a payment or adjustment reference."));
+      return;
+    }
+    const signedPaise =
+      walletAction.mode === "add" ? rupeesAmount * 100 : -rupeesAmount * 100;
+    setWalletSaving(true);
     try {
-      await api(`/admin/users/${user._id}/wallet`, {
+      await api(`/admin/users/${walletAction.user._id}/wallet`, {
         method: "POST",
-        body: JSON.stringify({ amountPaise: rupees * 100, referenceId }),
+        body: JSON.stringify({ amountPaise: signedPaise, referenceId }),
       });
-      onChanged("Wallet adjusted and recorded.");
+      const verb = walletAction.mode === "add" ? "added to" : "deducted from";
+      setWalletAction(null);
+      onChanged(`₹${rupeesAmount} ${verb} wallet and recorded.`);
     } catch (cause) {
       onError(cause);
+    } finally {
+      setWalletSaving(false);
     }
   }
   return (
@@ -533,8 +554,11 @@ function UsersView({
                   <Button onClick={() => void toggle(user)}>
                     {user.disabled ? "Enable" : "Disable"}
                   </Button>
-                  <Button onClick={() => void adjust(user)}>
-                    Adjust wallet
+                  <Button onClick={() => openWalletModal(user, "add")}>
+                    Add money
+                  </Button>
+                  <Button onClick={() => openWalletModal(user, "deduct")}>
+                    Deduct money
                   </Button>
                 </td>
               </tr>
@@ -544,6 +568,80 @@ function UsersView({
       </div>
       {users.length === 0 && <p>No players on this page.</p>}
       <Pager page={page} hasNext={users.length === 25} onPage={onPage} />
+      {walletAction && (
+        <div
+          className="modalBackdrop"
+          role="presentation"
+          onClick={() => setWalletAction(null)}
+        >
+          <section
+            className="modalCard"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modalHeader">
+              <h2>
+                {walletAction.mode === "add"
+                  ? "Add money to wallet"
+                  : "Deduct money from wallet"}
+              </h2>
+              <Button onClick={() => setWalletAction(null)}>Close</Button>
+            </div>
+            <p>
+              <strong>
+                {walletAction.user.name ?? walletAction.user.email ?? "Player"}
+              </strong>{" "}
+              ({walletAction.user.phone ?? "—"}) • Current balance:{" "}
+              {rupees(walletAction.user.balancePaise)}
+            </p>
+            <form className="stack" onSubmit={(event) => void submitWalletChange(event)}>
+              <Select
+                label="Action"
+                value={walletAction.mode}
+                onChange={(event) =>
+                  setWalletAction({
+                    ...walletAction,
+                    mode: event.target.value as "add" | "deduct",
+                  })
+                }
+              >
+                <option value="add">Add Money (+)</option>
+                <option value="deduct">Deduct Money (-)</option>
+              </Select>
+              <Input
+                label="Amount (₹)"
+                type="number"
+                min={1}
+                step={1}
+                value={walletAmount}
+                onChange={(event) => setWalletAmount(event.target.value)}
+                placeholder="Enter whole rupee amount"
+                required
+              />
+              <Input
+                label="Reference / Reason"
+                value={walletReference}
+                onChange={(event) => setWalletReference(event.target.value)}
+                placeholder="e.g. Manual deposit / Correction"
+                required
+              />
+              <div className="actions">
+                <Button type="submit" disabled={walletSaving}>
+                  {walletSaving
+                    ? "Saving..."
+                    : walletAction.mode === "add"
+                    ? "Add Money"
+                    : "Deduct Money"}
+                </Button>
+                <Button onClick={() => setWalletAction(null)} disabled={walletSaving}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </Panel>
   );
 }

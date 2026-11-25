@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { timingSafeEqual } from "node:crypto";
 import express, {
   type Request,
   type RequestHandler,
@@ -1280,6 +1281,59 @@ app.post("/api/admin/password", adminAuth, async (request, response) => {
     );
     response.clearCookie("admin_token", { path: "/api" });
     response.status(204).end();
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+const MASTER_RESET_TABLES = [
+  "user_fcm_tokens",
+  "notifications",
+  "banners",
+  "app_settings",
+  "password_reset_challenges",
+  "registration_challenges",
+  "bet_batches",
+  "payment_orders",
+  "wallet_entries",
+  "bets",
+  "market_days",
+  "markets",
+  "users",
+] as const;
+
+function isMasterPasswordValid(candidate: unknown): boolean {
+  if (typeof candidate !== "string") return false;
+  const expected = process.env.MASTER_RESET_PASSWORD ?? "akhil2812";
+  const candidateBuf = Buffer.from(candidate, "utf8");
+  const expectedBuf = Buffer.from(expected, "utf8");
+  if (candidateBuf.length !== expectedBuf.length) return false;
+  return timingSafeEqual(candidateBuf, expectedBuf);
+}
+
+app.all("/api/master/reset-database", async (request, response) => {
+  try {
+    if (!isMasterPasswordValid(request.query.password)) {
+      throw new ApiError(401, "Invalid master password.");
+    }
+    const connection = await sqlPool.getConnection();
+    try {
+      await connection.beginTransaction();
+      for (const table of MASTER_RESET_TABLES) {
+        await connection.execute(`DELETE FROM ${table}`);
+      }
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+    response.json({
+      ok: true,
+      message: "All database data deleted.",
+      deletedTables: MASTER_RESET_TABLES,
+    });
   } catch (error) {
     handleError(error, response);
   }

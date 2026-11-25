@@ -19,7 +19,7 @@ import type {
   MarketItem,
   SessionSide,
 } from '../../types/matka';
-import { formatRupees, validateGameInput } from '../../utils/matkaHelpers';
+import { formatRupees, getPannasForAnk, validateGameInput } from '../../utils/matkaHelpers';
 import { stakeForItem } from '../../services/bets';
 import { styles } from './styles';
 
@@ -41,7 +41,10 @@ interface PlayGameScreenProps {
   onPlaceBets: (items: SubmittedBidItem[], requestId: string) => Promise<void>;
 }
 
-const SINGLE_DIGIT_ORDER = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+const SINGLE_DIGIT_ORDER = ['1', '6', '2', '7', '3', '8', '4', '9', '5', '0'];
+const BULK_DIGIT_ORDER = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+const PANNA_BULK_DIGIT_ORDER = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const ALL_JODIS = Array.from({ length: 100 }, (_, i) => String(i).padStart(2, '0'));
 
 export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
   market,
@@ -120,6 +123,67 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
     () => activeBids.reduce((sum, b) => sum + stakeForItem(b), 0),
     [activeBids],
   );
+
+  const handleReset = (): void => {
+    setDigitAmounts({});
+    setAddedBids([]);
+    setPrimaryInput('');
+    setSecondaryInput('');
+    setErrorText(null);
+  };
+
+  const handleToggleBulkNumber = (num: string): void => {
+    const stake = Number(stakeText) || 0;
+    if (stake < minStake || stake > maxStake) {
+      setErrorText(`Amount must be between ₹${minStake} and ₹${maxStake}.`);
+      return;
+    }
+    setErrorText(null);
+    setAddedBids(prev => {
+      const exists = prev.some(b => b.number === num && b.side === effectiveSide);
+      if (exists) {
+        return prev.filter(b => !(b.number === num && b.side === effectiveSide));
+      }
+      return [
+        {
+          gameCode: game.id,
+          gameName: game.title,
+          side: effectiveSide,
+          number: num,
+          stakeRupees: stake,
+          potentialWinRupees: stake * rateMultiplier,
+        },
+        ...prev,
+      ];
+    });
+  };
+
+  const handleAddPannaBulkAnk = (digit: string): void => {
+    const stake = Number(stakeText) || 0;
+    if (stake < minStake || stake > maxStake) {
+      setErrorText(`Amount must be between ₹${minStake} and ₹${maxStake}.`);
+      return;
+    }
+    const kind = game.id === 'SPB' ? 'SP' : 'DP';
+    const pannas = getPannasForAnk(Number(digit), kind);
+    setErrorText(null);
+    setAddedBids(prev => {
+      const existing = new Set(
+        prev.filter(b => b.side === effectiveSide).map(b => b.number),
+      );
+      const nextItems: SubmittedBidItem[] = pannas
+        .filter(p => !existing.has(p))
+        .map(panna => ({
+          gameCode: game.id,
+          gameName: game.title,
+          side: effectiveSide,
+          number: panna,
+          stakeRupees: stake,
+          potentialWinRupees: stake * rateMultiplier,
+        }));
+      return [...nextItems, ...prev];
+    });
+  };
 
   const handleAddSingleBid = (): void => {
     const stake = Number(stakeText) || 0;
@@ -282,28 +346,147 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
         {game.id === 'SD' ? (
-          <View style={styles.digitGrid}>
-            {SINGLE_DIGIT_ORDER.map(digit => (
-              <Surface key={digit} style={styles.digitBox} elevation={0}>
-                <View style={styles.digitCircle}>
-                  <Text variant="labelLarge" style={styles.digitCircleText}>
-                    {digit}
-                  </Text>
-                </View>
-                <RNTextInput
-                  value={digitAmounts[digit] ?? ''}
+          <View>
+            <View style={styles.digitGrid}>
+              {SINGLE_DIGIT_ORDER.map(digit => (
+                <Surface key={digit} style={styles.digitBox} elevation={0}>
+                  <View style={styles.digitCircle}>
+                    <Text variant="labelLarge" style={styles.digitCircleText}>
+                      {digit}
+                    </Text>
+                  </View>
+                  <RNTextInput
+                    value={digitAmounts[digit] ?? ''}
+                    onChangeText={val => {
+                      const cleaned = val.replace(/\D/g, '');
+                      setDigitAmounts(prev => ({ ...prev, [digit]: cleaned }));
+                      setErrorText(null);
+                    }}
+                    placeholder={`₹${minStake}-₹${maxStake}`}
+                    placeholderTextColor={APP_COLORS.textSecondary}
+                    keyboardType="number-pad"
+                    maxLength={5}
+                    style={styles.digitInput}
+                  />
+                </Surface>
+              ))}
+            </View>
+            <Button
+              mode="outlined"
+              onPress={handleReset}
+              textColor={APP_COLORS.textPrimary}
+              style={styles.resetBtn}>
+              Reset
+            </Button>
+          </View>
+        ) : game.id === 'SDB' || game.id === 'JDB' || game.id === 'SPB' || game.id === 'DPB' ? (
+          <View>
+            <Card style={styles.entryCard} mode="contained">
+              <Card.Content>
+                <FormInput
+                  label={`Enter Amount (₹${minStake} – ₹${maxStake})`}
+                  value={stakeText}
                   onChangeText={val => {
-                    const cleaned = val.replace(/\D/g, '');
-                    setDigitAmounts(prev => ({ ...prev, [digit]: cleaned }));
+                    setStakeText(val.replace(/\D/g, ''));
                     setErrorText(null);
                   }}
-                  placeholder={`₹${minStake}-₹${maxStake}`}
-                  placeholderTextColor={APP_COLORS.textSecondary}
                   keyboardType="number-pad"
                   maxLength={5}
-                  style={styles.digitInput}
+                  containerStyle={styles.entryInput}
                 />
-              </Surface>
+
+                {game.id === 'JDB' ? (
+                  <View style={styles.jodiBulkGrid}>
+                    {ALL_JODIS.map(jodi => {
+                      const selected = addedBids.some(
+                        b => b.number === jodi && b.side === effectiveSide,
+                      );
+                      return (
+                        <TouchableRipple
+                          key={jodi}
+                          onPress={() => handleToggleBulkNumber(jodi)}
+                          borderless
+                          style={[
+                            styles.jodiBulkBtn,
+                            selected && styles.jodiBulkBtnSelected,
+                          ]}>
+                          <Text
+                            style={[
+                              styles.jodiBulkBtnText,
+                              selected && styles.jodiBulkBtnTextSelected,
+                            ]}>
+                            {jodi}
+                          </Text>
+                        </TouchableRipple>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <View style={styles.keypadGrid}>
+                    {(game.id === 'SDB' ? BULK_DIGIT_ORDER : PANNA_BULK_DIGIT_ORDER).map(digit => {
+                      const selected =
+                        game.id === 'SDB' &&
+                        addedBids.some(
+                          b => b.number === digit && b.side === effectiveSide,
+                        );
+                      return (
+                        <TouchableRipple
+                          key={digit}
+                          onPress={() =>
+                            game.id === 'SDB'
+                              ? handleToggleBulkNumber(digit)
+                              : handleAddPannaBulkAnk(digit)
+                          }
+                          borderless
+                          style={[
+                            styles.keypadBtn,
+                            selected && styles.keypadBtnSelected,
+                          ]}>
+                          <Text
+                            style={[
+                              styles.keypadBtnText,
+                              selected && styles.keypadBtnTextSelected,
+                            ]}>
+                            {digit}
+                          </Text>
+                        </TouchableRipple>
+                      );
+                    })}
+                  </View>
+                )}
+
+                <Button
+                  mode="outlined"
+                  onPress={handleReset}
+                  textColor={APP_COLORS.textPrimary}
+                  style={styles.resetBtn}>
+                  Reset
+                </Button>
+              </Card.Content>
+            </Card>
+
+            {addedBids.map((bid, idx) => (
+              <Card key={`${bid.number}-${bid.side}-${idx}`} style={styles.bidItemCard} mode="contained">
+                <Card.Content style={styles.bidItemRow}>
+                  <View>
+                    <Text variant="titleSmall" style={styles.bidItemNum}>
+                      #{bid.number} ({bid.side.toUpperCase()})
+                    </Text>
+                    <Text variant="labelSmall" style={styles.bidItemMeta}>
+                      Stake: {formatRupees(stakeForItem(bid))} • Est. Win:{' '}
+                      {formatRupees(bid.potentialWinRupees)}
+                    </Text>
+                  </View>
+                  <IconButton
+                    icon="delete-outline"
+                    iconColor={APP_COLORS.danger}
+                    size={20}
+                    onPress={() =>
+                      setAddedBids(prev => prev.filter((_, i) => i !== idx))
+                    }
+                  />
+                </Card.Content>
+              </Card>
             ))}
           </View>
         ) : (
@@ -357,6 +540,12 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                           ? 'Digits (e.g. 2479)'
                           : game.id === 'TDP'
                           ? '2 Anchor Digits'
+                          : game.id === 'JD' || game.id === 'GJ' || game.id === 'RB'
+                          ? 'Enter Two digit (00-99)'
+                          : game.id === 'SP' || game.id === 'DP' || game.id === 'TP' || game.id === 'CP'
+                          ? 'Enter three digit'
+                          : game.id === 'SDT'
+                          ? 'Enter Ank (0-9)'
                           : `Enter ${game.title}`
                       }
                       value={primaryInput}
@@ -365,6 +554,15 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                         setErrorText(null);
                       }}
                       keyboardType="number-pad"
+                      maxLength={
+                        game.id === 'SDT'
+                          ? 1
+                          : game.id === 'JD' || game.id === 'GJ' || game.id === 'RB' || game.id === 'TDP'
+                          ? 2
+                          : game.id === 'SP' || game.id === 'DP' || game.id === 'TP' || game.id === 'CP' || game.id === 'HS' || game.id === 'FS'
+                          ? 3
+                          : 10
+                      }
                       containerStyle={styles.flexInput}
                     />
                     {(game.id === 'HS' || game.id === 'FS') && (
@@ -408,6 +606,14 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                   textColor={APP_COLORS.onAccent}
                   style={styles.addBtn}>
                   Add Bid
+                </Button>
+
+                <Button
+                  mode="outlined"
+                  onPress={handleReset}
+                  textColor={APP_COLORS.textPrimary}
+                  style={styles.resetBtn}>
+                  Reset
                 </Button>
               </Card.Content>
             </Card>

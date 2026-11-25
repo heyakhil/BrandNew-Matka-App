@@ -144,6 +144,64 @@ export const styles = StyleSheet.create({
     borderRadius: 10,
     marginTop: 4,
   },
+  resetBtn: {
+    borderRadius: 10,
+    marginTop: 10,
+    borderColor: APP_COLORS.border,
+  },
+  keypadGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+    marginVertical: 10,
+  },
+  keypadBtn: {
+    width: '21%',
+    minWidth: 56,
+    height: 46,
+    borderRadius: 10,
+    backgroundColor: APP_COLORS.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  keypadBtnSelected: {
+    backgroundColor: APP_COLORS.gradientStart,
+  },
+  keypadBtnText: {
+    color: APP_COLORS.onAccent,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  keypadBtnTextSelected: {
+    color: APP_COLORS.white,
+  },
+  jodiBulkGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 6,
+    marginVertical: 10,
+  },
+  jodiBulkBtn: {
+    width: '18.2%',
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: APP_COLORS.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  jodiBulkBtnSelected: {
+    backgroundColor: APP_COLORS.gradientStart,
+  },
+  jodiBulkBtnText: {
+    color: APP_COLORS.onAccent,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  jodiBulkBtnTextSelected: {
+    color: APP_COLORS.white,
+  },
   bidItemCard: {
     backgroundColor: APP_COLORS.secondary,
     borderRadius: 12,

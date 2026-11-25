@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { GradientButton } from '../../components/atoms/GradientButton';
-import { PassbookRow } from '../../components/molecules/PassbookRow';
+import {
+  PASSBOOK_COLUMN_WIDTHS,
+  PassbookRow,
+} from '../../components/molecules/PassbookRow';
 import { APP_COLORS } from '../../theme/paperTheme';
 import type { WalletTransaction } from '../../types/matka';
 
@@ -28,20 +31,47 @@ export const PassbookScreen: React.FC<PassbookScreenProps> = ({
 
   return (
     <View style={styles.container}>
-      <View style={styles.tableHeader}>
-        <Text style={styles.headerText}>Previous Amount</Text>
-        <Text style={styles.headerText}>Transaction Amount</Text>
-        <Text style={styles.headerText}>Current Amount</Text>
-      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tableScroll}
+        contentContainerStyle={styles.tableScrollContent}
+      >
+        <View style={styles.tableContainer}>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.headerText, { width: PASSBOOK_COLUMN_WIDTHS.date }]}>
+              Transaction Date
+            </Text>
+            <Text
+              style={[
+                styles.headerText,
+                styles.particularsHeader,
+                { width: PASSBOOK_COLUMN_WIDTHS.particulars },
+              ]}
+            >
+              Particulars
+            </Text>
+            <Text style={[styles.headerText, { width: PASSBOOK_COLUMN_WIDTHS.previous }]}>
+              Previous Amount
+            </Text>
+            <Text style={[styles.headerText, { width: PASSBOOK_COLUMN_WIDTHS.amount }]}>
+              Transaction Amount
+            </Text>
+            <Text style={[styles.headerText, { width: PASSBOOK_COLUMN_WIDTHS.current }]}>
+              Current Amount
+            </Text>
+          </View>
 
-      <FlatList
-        data={pageItems}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={<Text style={styles.empty}>{emptyText}</Text>}
-        renderItem={({ item }) => <PassbookRow transaction={item} />}
-      />
+          <FlatList
+            data={pageItems}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={<Text style={styles.empty}>{emptyText}</Text>}
+            renderItem={({ item }) => <PassbookRow transaction={item} />}
+          />
+        </View>
+      </ScrollView>
 
       <View style={styles.pagination}>
         <GradientButton
@@ -73,20 +103,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: APP_COLORS.primaryBackground,
   },
+  tableScroll: {
+    flex: 1,
+  },
+  tableScrollContent: {
+    paddingHorizontal: 6,
+  },
+  tableContainer: {
+    flex: 1,
+  },
   tableHeader: {
     flexDirection: 'row',
     height: 48,
+    alignItems: 'center',
   },
   headerText: {
-    flex: 1,
     color: APP_COLORS.textPrimary,
-    fontSize: 11,
+    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
-    textAlignVertical: 'center',
-    paddingHorizontal: 2,
+    paddingHorizontal: 6,
+  },
+  particularsHeader: {
+    textAlign: 'left',
   },
   list: {
-    paddingHorizontal: 6,
     paddingBottom: 12,
   },
   empty: {

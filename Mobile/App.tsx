@@ -495,7 +495,8 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
 
   const hasOwnHeader =
     (!sidebarScreen && Boolean(selectedMarket && selectedGame)) ||
-    (sidebarScreen === 'gameChart' && selectedChart !== null);
+    (sidebarScreen === 'gameChart' && selectedChart !== null) ||
+    (!sidebarScreen && !selectedMarket && activeTab === 'allBids' && bidsSubView === 'bidHistory');
   const isHome = !sidebarScreen && !selectedMarket && activeTab === 'home';
 
   const renderSidebarScreen = (): React.ReactNode => {
@@ -554,7 +555,7 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
   const renderBidsScreen = (): React.ReactNode => {
     switch (bidsSubView) {
       case 'bidHistory':
-        return <BidHistoryScreen bids={bids} />;
+        return <BidHistoryScreen bids={bids} onBack={() => setBidsSubView('menu')} />;
       case 'gameResults':
         return (
           <GameResultScreen

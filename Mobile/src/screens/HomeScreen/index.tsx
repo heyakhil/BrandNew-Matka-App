@@ -71,8 +71,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <InfoModal
         visible={closedMarket !== null}
         onDismiss={() => setClosedMarket(null)}
-        title="Bidding is Closed For Today"
-        subtitle={closedMarket?.name}
+        title="Sorry!"
+        subtitle="Bazar Is closed!"
+        message={closedMarket?.name}
         rows={
           closedMarket
             ? [
