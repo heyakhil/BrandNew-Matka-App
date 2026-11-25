@@ -1,9 +1,23 @@
 import { loginPlayer, startPlayerRegistration } from '../src/services/api';
+import { resolveApiUrl } from '../src/services/apiConfig';
 
 const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+});
+
+test('uses the Metro host for development instead of the device localhost', () => {
+  expect(resolveApiUrl('', true, 'http://192.168.1.20:8081/index.bundle', 'android'))
+    .toBe('http://192.168.1.20:4000/api');
+});
+
+test('requires an HTTPS API URL for release builds', () => {
+  expect(resolveApiUrl('https://api.royalclub.example/api/', false))
+    .toBe('https://api.royalclub.example/api');
+  expect(() => resolveApiUrl('', false)).toThrow(
+    'Royal Club server URL is not configured for this app build.',
+  );
 });
 
 test('explains an unreachable API', async () => {

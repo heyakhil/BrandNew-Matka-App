@@ -1,9 +1,10 @@
-import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Card, Icon, Text } from 'react-native-paper';
 import { APP_COLORS } from '../../theme/paperTheme';
+import { fetchNotifications, type AppNotification } from '../../services/api';
 
-const NOTICES = [
+const DEFAULT_NOTICES = [
   {
     id: 'n1',
     title: 'Security & OTP Warning',
@@ -22,12 +23,50 @@ const NOTICES = [
 ];
 
 export const NoticeScreen: React.FC = () => {
+  const [items, setItems] = useState<Array<{ id: string; title: string; body: string; date?: string }>>(DEFAULT_NOTICES);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadNotices = async (): Promise<void> => {
+    try {
+      const data = await fetchNotifications();
+      if (data && data.length > 0) {
+        setItems(
+          data.map((item) => ({
+            id: item._id,
+            title: item.title,
+            body: item.description,
+            date: new Date(item.createdAt).toLocaleDateString('en-IN', {
+              day: 'numeric',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+          })),
+        );
+      }
+    } catch {
+      // Retain fallback notices
+    }
+  };
+
+  useEffect(() => {
+    void loadNotices();
+  }, []);
+
+  const onRefresh = async (): Promise<void> => {
+    setRefreshing(true);
+    await loadNotices();
+    setRefreshing(false);
+  };
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}>
-      {NOTICES.map(item => (
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
+    >
+      {items.map((item) => (
         <Card key={item.id} style={styles.card} mode="contained">
           <Card.Content>
             <View style={styles.titleRow}>
@@ -43,6 +82,11 @@ export const NoticeScreen: React.FC = () => {
             <Text variant="bodySmall" style={styles.body}>
               {item.body}
             </Text>
+            {item.date && (
+              <Text variant="labelSmall" style={styles.dateText}>
+                {item.date}
+              </Text>
+            )}
           </Card.Content>
         </Card>
       ))}
@@ -81,5 +125,11 @@ const styles = StyleSheet.create({
   body: {
     color: APP_COLORS.textSecondary,
     lineHeight: 20,
+  },
+  dateText: {
+    color: APP_COLORS.accent,
+    marginTop: 8,
+    alignSelf: 'flex-end',
+    fontSize: 11,
   },
 });

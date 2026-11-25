@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { Text } from 'react-native-paper';
+import { ActivityIndicator, Text } from 'react-native-paper';
 import { APP_COLORS, BRAND_GRADIENT } from '../../theme/paperTheme';
 
 interface GradientButtonProps {
@@ -13,6 +13,7 @@ interface GradientButtonProps {
   fontSize?: number;
   contentPadding?: number;
   disabled?: boolean;
+  loading?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -24,18 +25,19 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
   fontSize = 15,
   contentPadding = 10,
   disabled = false,
+  loading = false,
   style,
 }) => (
   <Pressable
     accessibilityRole="button"
     accessibilityLabel={label}
-    accessibilityState={{ disabled }}
-    disabled={disabled}
+    accessibilityState={{ disabled: disabled || loading, busy: loading }}
+    disabled={disabled || loading}
     onPress={onPress}
     style={[
       styles.shadow,
       { borderRadius: height / 2 },
-      disabled && styles.disabled,
+      (disabled || loading) && styles.disabled,
       style,
     ]}>
     <LinearGradient
@@ -44,11 +46,15 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
       end={{ x: 1, y: 0.5 }}
       style={[styles.gradient, { height, borderRadius: height / 2, paddingHorizontal: contentPadding }]}>
       {leading}
-      <Text
-        numberOfLines={1}
-        style={[styles.label, { fontSize }, leading ? styles.labelWithLeading : null]}>
-        {label}
-      </Text>
+      {loading ? (
+        <ActivityIndicator color={APP_COLORS.white} size="small" />
+      ) : (
+        <Text
+          numberOfLines={1}
+          style={[styles.label, { fontSize }, leading ? styles.labelWithLeading : null]}>
+          {label}
+        </Text>
+      )}
     </LinearGradient>
   </Pressable>
 );

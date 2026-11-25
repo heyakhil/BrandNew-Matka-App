@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "304805314897",
+    "project_id": "royalclub-c20b3",
+    "storage_bucket": "royalclub-c20b3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:304805314897:android:538d6eaba234bdcf0b5370",
+        "android_client_info": {
+          "package_name": "com.mataka.royaclub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCR7rp15fewyOxqLvy82gokpuwKCFqRarU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

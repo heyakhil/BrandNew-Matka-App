@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  AppState,
   BackHandler,
   Linking,
   Share,
@@ -7,7 +8,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { Button, Dialog, PaperProvider, Portal, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Dialog, PaperProvider, Portal, Text } from 'react-native-paper';
 import FlashMessage from 'react-native-flash-message';
 import {
   SafeAreaProvider,
@@ -58,11 +59,22 @@ import type {
   WalletTransaction,
 } from './src/types/matka';
 import { formatRupees } from './src/utils/matkaHelpers';
-import { loadAccount, saveProfile, submitBets } from './src/services/api';
+import {
+  createPay0Payment,
+  getPay0PaymentStatus,
+  loadAccount,
+  saveProfile,
+  submitBets,
+} from './src/services/api';
 import { changePassword } from './src/services/api';
 import { toBetRequest } from './src/services/bets';
+import { getAuthToken, removeAuthToken, setAuthToken } from './src/services/storage';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { notifyError, notifySuccess, notifyWarning } from './src/services/flashMessage';
+import {
+  initPushNotifications,
+  unregisterPushNotifications,
+} from './src/services/pushNotification';
 
 const SIDEBAR_TITLES: Record<SidebarScreenKey, string> = {
   profile: 'Profile',
@@ -104,6 +116,7 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
   const [fundsSubView, setFundsSubView] = useState<FundsSubView>('menu');
   const [bidsSubView, setBidsSubView] = useState<MyBidsSubView>('menu');
   const [selectedChart, setSelectedChart] = useState<SelectedChart | null>(null);
+  const [chartOpenedFromModal, setChartOpenedFromModal] = useState<boolean>(false);
 
   const [profile, setProfile] = useState<UserProfile>({
     name: 'Royal Club Member',
@@ -129,6 +142,9 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
     null,
   );
   const [chartMarket, setChartMarket] = useState<MarketItem | null>(null);
+  const [pendingPaymentOrderId, setPendingPaymentOrderId] = useState<string | null>(
+    null,
+  );
 
   const refreshAccount = useCallback(async (): Promise<void> => {
     if (!session) return;
@@ -142,10 +158,92 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
       setProfile(account.profile);
     } catch (error) {
       notifyError(error instanceof Error ? error.message : 'Unable to refresh account.');
+      if (
+        error instanceof Error &&
+        (error.message.toLowerCase().includes('unauthorized') ||
+          error.message.toLowerCase().includes('invalid token') ||
+          error.message.toLowerCase().includes('jwt') ||
+          error.message.toLowerCase().includes('token expired'))
+      ) {
+        onLogout?.();
+      }
     }
-  }, [session]);
+  }, [session, onLogout]);
 
   useEffect(() => { void refreshAccount(); }, [refreshAccount]);
+
+  const reconcilePayment = useCallback(
+    async (orderId: string, showError: boolean = false): Promise<void> => {
+      if (!session) return;
+      try {
+        const payment = await getPay0PaymentStatus(session.token, orderId);
+        if (payment.status === 'processing') return;
+        setPendingPaymentOrderId(null);
+        if (payment.status === 'paid') {
+          await refreshAccount();
+          setFundsSubView('menu');
+          notifySuccess(
+            `₹${payment.amountPaise / 100} added to your wallet.`,
+          );
+        } else {
+          notifyWarning('Payment failed or expired. Please try again.');
+        }
+      } catch (error) {
+        console.warn('Unable to verify payment status.', error);
+        if (showError)
+          notifyError(
+            error instanceof Error
+              ? error.message
+              : 'Unable to verify payment status.',
+          );
+      }
+    },
+    [refreshAccount, session],
+  );
+
+  useEffect(() => {
+    if (!pendingPaymentOrderId) return;
+    const interval = setInterval(() => {
+      void reconcilePayment(pendingPaymentOrderId);
+    }, 3000);
+    void reconcilePayment(pendingPaymentOrderId);
+    return () => clearInterval(interval);
+  }, [pendingPaymentOrderId, reconcilePayment]);
+
+  useEffect(() => {
+    const handleUrl = (url: string): void => {
+      if (!url.startsWith('royalclubmatka://payment/')) return;
+      const match = url.match(/[?&]order_id=([^&]+)/i);
+      if (!match?.[1]) return;
+      try {
+        const orderId = decodeURIComponent(match[1]);
+        setPendingPaymentOrderId(orderId);
+        void reconcilePayment(orderId, true);
+      } catch (error) {
+        console.warn('Invalid payment redirect URL.', error);
+      }
+    };
+    const subscription = Linking.addEventListener('url', event =>
+      handleUrl(event.url),
+    );
+    const loadInitialUrl = async (): Promise<void> => {
+      try {
+        const url = await Linking.getInitialURL();
+        if (url) handleUrl(url);
+      } catch (error) {
+        console.warn('Unable to read payment redirect URL.', error);
+      }
+    };
+    void loadInitialUrl();
+    const appStateSubscription = AppState.addEventListener('change', state => {
+      if (state === 'active' && pendingPaymentOrderId)
+        void reconcilePayment(pendingPaymentOrderId);
+    });
+    return () => {
+      subscription.remove();
+      appStateSubscription.remove();
+    };
+  }, [pendingPaymentOrderId, reconcilePayment]);
 
   const handleBack = useCallback((): boolean => {
     if (logoutDialogOpen) {
@@ -156,8 +254,13 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
       setChartMarket(null);
     } else if (sidebarScreen === 'gameChart' && selectedChart) {
       setSelectedChart(null);
+      if (chartOpenedFromModal) {
+        setSidebarScreen(null);
+        setChartOpenedFromModal(false);
+      }
     } else if (sidebarScreen) {
       setSidebarScreen(null);
+      setChartOpenedFromModal(false);
     } else if (activeTab === 'wallet' && fundsSubView !== 'menu') {
       setFundsSubView('menu');
     } else if (activeTab === 'allBids' && bidsSubView !== 'menu') {
@@ -183,6 +286,7 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
     selectedGame,
     selectedMarket,
     activeTab,
+    chartOpenedFromModal,
   ]);
 
   useEffect(() => {
@@ -214,6 +318,7 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
     setSelectedGame(null);
     setSelectedMarket(null);
     setSelectedChart(null);
+    setChartOpenedFromModal(false);
     setFundsSubView('menu');
     setBidsSubView('menu');
   };
@@ -338,8 +443,15 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
     );
   };
 
-  const handleAddFund = (amount: number): void => {
-    if (live) { notifyWarning('Contact support to add funds.'); return; }
+  const handleAddFund = async (amount: number): Promise<void> => {
+    if (live) {
+      if (!session) throw new Error('Please log in before adding funds.');
+      const payment = await createPay0Payment(session.token, amount);
+      setPendingPaymentOrderId(payment.orderId);
+      await Linking.openURL(payment.paymentUrl);
+      notifySuccess('Complete the payment in the opened secure gateway.');
+      return;
+    }
     setBalanceRupees(prev => prev + amount);
     setTransactions(prev => [
       {
@@ -412,7 +524,13 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
           <GameChartScreen
             markets={markets}
             selectedChart={selectedChart}
-            onSelectChart={setSelectedChart}
+            onSelectChart={chart => {
+              setSelectedChart(chart);
+              if (!chart && chartOpenedFromModal) {
+                setSidebarScreen(null);
+                setChartOpenedFromModal(false);
+              }
+            }}
           />
         );
       case 'changePassword':
@@ -485,7 +603,7 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
             onPlaceBet={market => setSelectedMarket(market)}
             onOpenChart={market => setChartMarket(market)}
             onOpenRates={() => setSidebarScreen('gameRates')}
-            onAddFunds={() => live ? void handleOpenWhatsApp() : openFunds('addFund')}
+            onAddFunds={() => openFunds('addFund')}
             onWithdraw={() => live ? void handleOpenWhatsApp() : openFunds('withdraw')}
             onInvite={() => {
               handleShareApp();
@@ -527,7 +645,7 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
     <View
       style={[
         styles.root,
-        { paddingTop: insets.top, paddingBottom: insets.bottom },
+        { paddingTop: insets.top },
       ]}>
       {!hasOwnHeader &&
         (isHome ? (
@@ -551,7 +669,11 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
       <View style={styles.screenArea}>{renderScreen()}</View>
 
       {!sidebarScreen && !selectedGame && (
-        <BottomTabBar activeTab={activeTab} onTabPress={handleTabPress} />
+        <BottomTabBar
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+          bottomInset={insets.bottom}
+        />
       )}
 
       <AppDrawerModal
@@ -573,6 +695,12 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
         visible={Boolean(chartMarket)}
         market={chartMarket}
         onDismiss={() => setChartMarket(null)}
+        onSelectChart={(market, mode) => {
+          setChartMarket(null);
+          setChartOpenedFromModal(true);
+          setSelectedChart({ market, mode });
+          setSidebarScreen('gameChart');
+        }}
       />
 
       <Portal>
@@ -613,16 +741,90 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
   );
 }
 
-function App({ demo = false }: { demo?: boolean }): React.JSX.Element {
-  const [session, setSession] = useState<MobileSession | null>(null);
+function App({
+  demo = false,
+  initialSession = null,
+}: {
+  demo?: boolean;
+  initialSession?: MobileSession | null;
+}): React.JSX.Element {
+  const [session, setSession] = useState<MobileSession | null>(initialSession);
+  const [loading, setLoading] = useState<boolean>(!demo && !initialSession);
+
+  useEffect(() => {
+    if (demo || initialSession) {
+      setLoading(false);
+      return;
+    }
+    let active = true;
+    const restoreSession = async (): Promise<void> => {
+      try {
+        const storedToken = await getAuthToken();
+        if (storedToken && active) {
+          setSession({ token: storedToken });
+        }
+      } catch {
+        // Fallback to login
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+    void restoreSession();
+    return () => {
+      active = false;
+    };
+  }, [demo, initialSession]);
+
+  useEffect(() => {
+    void initPushNotifications(session?.token);
+  }, [session?.token]);
+
+  const handleAuthenticated = async (token: string): Promise<void> => {
+    try {
+      await setAuthToken(token);
+    } catch {
+      // Ignored
+    }
+    setSession({ token });
+  };
+
+  const handleTokenChange = async (token: string): Promise<void> => {
+    try {
+      await setAuthToken(token);
+    } catch {
+      // Ignored
+    }
+    setSession(previous => (previous ? { ...previous, token } : { token }));
+  };
+
+  const handleLogout = async (): Promise<void> => {
+    try {
+      await unregisterPushNotifications();
+      await removeAuthToken();
+    } catch {
+      // Ignored
+    }
+    setSession(null);
+  };
+
   return (
     <SafeAreaProvider>
       <PaperProvider theme={royalMatkaTheme}>
         <StatusBar barStyle="dark-content" />
-        {session || demo ? (
-          <AppShell session={session} onLogout={() => setSession(null)} onTokenChange={token => setSession(previous => previous ? { ...previous, token } : null)} />
+        {loading ? (
+          <View style={styles.splash}>
+            <ActivityIndicator size="large" color={APP_COLORS.gradientStart} />
+          </View>
+        ) : session || demo ? (
+          <AppShell
+            session={session}
+            onLogout={handleLogout}
+            onTokenChange={handleTokenChange}
+          />
         ) : (
-          <LoginScreen onAuthenticated={token => setSession({ token })} />
+          <LoginScreen onAuthenticated={handleAuthenticated} />
         )}
         <FlashMessage position="top" />
       </PaperProvider>
@@ -634,6 +836,12 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: APP_COLORS.primaryBackground,
+  },
+  splash: {
+    flex: 1,
+    backgroundColor: APP_COLORS.primaryBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   screenArea: {
     flex: 1,

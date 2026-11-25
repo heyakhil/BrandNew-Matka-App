@@ -207,3 +207,15 @@ export function formatRupees(amount: number): string {
     maximumFractionDigits: 2,
   })}`;
 }
+
+export function formatDisplayTime(time: string | undefined): string {
+  if (!time) return '—';
+  const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+  if (!match) return time.trim();
+  const hours24 = Number(match[1]);
+  const minutes = match[2];
+  if (hours24 > 23) return time.trim();
+  const period = hours24 >= 12 ? 'PM' : 'AM';
+  const hours12 = hours24 % 12 || 12;
+  return `${String(hours12).padStart(2, '0')}:${minutes} ${period}`;
+}

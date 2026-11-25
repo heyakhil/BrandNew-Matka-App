@@ -4,7 +4,9 @@ This is a new [**React Native**](https://reactnative.dev) project, bootstrapped 
 
 ## Phone verification setup
 
-The Android application ID and iOS bundle identifier are `com.mataka.royaclub`. Registration and password reset use the server's Renflair four-digit SMS flow. For local USB testing, connect a phone with USB debugging enabled and run `npm run android:local` from `Mobile`. This starts the API and Metro if needed, forwards ports 4000 and 8081, installs the current debug app, and launches it. Run the command again after reconnecting the phone. A release APK requires a deployed HTTPS API address; `localhost` on a standalone phone does not reach the development computer.
+The Android application ID and iOS bundle identifier are `com.mataka.royaclub`. Registration and password reset use the server's Renflair four-digit SMS flow. For local USB testing, connect a phone with USB debugging enabled and run `npm run android:local` from `Mobile`. This starts the API and Metro if needed, forwards ports 4000 and 8081, installs the current debug app, and launches it. Run the command again after reconnecting the phone. Development builds automatically use the computer hosting Metro; `localhost` is never used as an emulator API host.
+
+Copy `.env.example` to `.env` and set `API_URL` to your deployed HTTPS API before building a release, for example `API_URL=https://api.example.com/api`. Rebuild the native app after changing `.env`.
 
 ## Build a signed Android release APK
 

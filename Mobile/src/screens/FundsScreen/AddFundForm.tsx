@@ -11,7 +11,7 @@ import { styles } from './styles';
 interface AddFundFormProps {
   profile: UserProfile;
   balanceRupees: number;
-  onSubmit: (amount: number) => void;
+  onSubmit: (amount: number) => Promise<void>;
 }
 
 export const AddFundForm: React.FC<AddFundFormProps> = ({
@@ -21,20 +21,34 @@ export const AddFundForm: React.FC<AddFundFormProps> = ({
 }) => {
   const [amountText, setAmountText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const minimumDepositRupees = __DEV__ ? 1 : MIN_DEPOSIT_RUPEES;
 
   const handleChange = (value: string): void => {
     setAmountText(value.replace(/\D/g, ''));
     setError(null);
   };
 
-  const handleSubmit = (): void => {
+  const handleSubmit = async (): Promise<void> => {
     const amount = Number(amountText);
-    if (!Number.isInteger(amount) || amount < MIN_DEPOSIT_RUPEES) {
-      setError(`Minimum amount is ₹${MIN_DEPOSIT_RUPEES}.`);
+    if (!Number.isInteger(amount) || amount < minimumDepositRupees) {
+      setError(`Minimum amount is ₹${minimumDepositRupees}.`);
       return;
     }
-    onSubmit(amount);
-    setAmountText('');
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onSubmit(amount);
+      setAmountText('');
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'Unable to open the payment gateway.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -61,7 +75,12 @@ export const AddFundForm: React.FC<AddFundFormProps> = ({
         />
       </ScrollView>
       <View style={styles.footer}>
-        <GradientButton label="ADD CASH" onPress={handleSubmit} height={50} />
+        <GradientButton
+          label="ADD CASH"
+          onPress={() => void handleSubmit()}
+          height={50}
+          loading={submitting}
+        />
       </View>
     </View>
   );

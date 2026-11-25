@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { FlatList, View } from 'react-native';
-import { Button, Dialog, Portal, Text } from 'react-native-paper';
 import { ContactLinksRow } from '../../components/molecules/ContactLinksRow';
 import { MarketCard } from '../../components/molecules/MarketCard';
 import { NoticeTicker } from '../../components/molecules/NoticeTicker';
 import { PromoHeroBanner } from '../../components/molecules/PromoHeroBanner';
+import { InfoModal } from '../../components/organisms/InfoModal';
 import { QuickActionGrid } from '../../components/organisms/QuickActionGrid';
 import type { MarketItem } from '../../types/matka';
-import { APP_COLORS } from '../../theme/paperTheme';
+import { formatDisplayTime } from '../../utils/matkaHelpers';
 import { styles } from './styles';
 
 interface HomeScreenProps {
@@ -68,20 +68,38 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         )}
       />
-      <Portal>
-        <Dialog visible={closedMarket !== null} onDismiss={() => setClosedMarket(null)} style={{ backgroundColor: APP_COLORS.white }}>
-          <Dialog.Icon icon="close-circle-outline" color={APP_COLORS.danger} size={40} />
-          <Dialog.Title style={{ textAlign: 'center', color: APP_COLORS.danger }}>Bidding is Closed For Today</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="titleMedium" style={{ textAlign: 'center', marginBottom: 12 }}>{closedMarket?.name}</Text>
-            <Text>Open Result Time: {closedMarket?.openTime}</Text>
-            <Text>Open Bid Last Time: {closedMarket?.openBidLastTime ?? closedMarket?.openTime}</Text>
-            <Text>Close Result Time: {closedMarket?.closeTime}</Text>
-            <Text>Close Bid Last Time: {closedMarket?.closeBidLastTime ?? closedMarket?.closeTime}</Text>
-          </Dialog.Content>
-          <Dialog.Actions><Button mode="contained" onPress={() => setClosedMarket(null)}>OK</Button></Dialog.Actions>
-        </Dialog>
-      </Portal>
+      <InfoModal
+        visible={closedMarket !== null}
+        onDismiss={() => setClosedMarket(null)}
+        title="Bidding is Closed For Today"
+        subtitle={closedMarket?.name}
+        rows={
+          closedMarket
+            ? [
+                {
+                  label: 'Open Result Time :',
+                  value: formatDisplayTime(closedMarket.openTime),
+                },
+                {
+                  label: 'Open Bid Last Time :',
+                  value: formatDisplayTime(
+                    closedMarket.openBidLastTime ?? closedMarket.openTime,
+                  ),
+                },
+                {
+                  label: 'Close Result Time :',
+                  value: formatDisplayTime(closedMarket.closeTime),
+                },
+                {
+                  label: 'Close Bid Last Time :',
+                  value: formatDisplayTime(
+                    closedMarket.closeBidLastTime ?? closedMarket.closeTime,
+                  ),
+                },
+              ]
+            : undefined
+        }
+      />
     </View>
   );
 };

@@ -1,11 +1,17 @@
 import "dotenv/config";
 import express, {
   type Request,
+  type RequestHandler,
   type Response,
   type NextFunction,
 } from "express";
 import cors from "cors";
-import { ObjectId } from "./db.ts";
+import type { RowDataPacket } from "mysql2/promise";
+import {
+  ADMIN_PERMISSIONS,
+  ObjectId,
+  type AdminPermission,
+} from "./db.ts";
 import { ZodError, z } from "zod";
 import {
   MatkaRulesError,
@@ -21,7 +27,7 @@ import {
   issueToken,
   authMiddleware,
 } from "./auth.ts";
-import { client, connectDatabase } from "./db.ts";
+import { client, connectDatabase, sqlPool } from "./db.ts";
 import { finishPasswordReset, startPasswordReset, verifyPasswordReset } from "./passwordReset.ts";
 import { pruneExpiredAuthRecords, startRegistration, verifyRegistration } from "./registration.ts";
 import {
@@ -34,6 +40,19 @@ import {
   placeBets,
   reverseResult,
 } from "./game.ts";
+import {
+  isFirebaseConfigured,
+  registerFcmToken,
+  removeFcmToken,
+  sendTopicPushNotification,
+  sendUserPushNotification,
+} from "./notification.ts";
+import {
+  createPay0Payment,
+  reconcilePay0Payment,
+  reconcileUserPayment,
+  verifyPay0WebhookSignature,
+} from "./payments.ts";
 import {
   betRequestSchema,
   credentialsSchema,
@@ -51,7 +70,8 @@ const app = express();
 const adminOrigin = process.env.ADMIN_ORIGIN ?? "http://localhost:5173";
 app.disable("x-powered-by");
 app.use(cors({ origin: adminOrigin, credentials: true }));
-app.use(express.json({ limit: "64kb" }));
+app.use(express.json({ limit: "3mb" }));
+app.use(express.urlencoded({ extended: false, limit: "16kb" }));
 app.use((request: Request, response: Response, next: NextFunction) => {
   if (
     !["GET", "HEAD", "OPTIONS"].includes(request.method) &&
@@ -100,6 +120,36 @@ const adminAuth = authMiddleware(
   (id) => data.users.findOne({ _id: id }),
   "admin"
 );
+function requireAdminPermission(permission: AdminPermission): RequestHandler {
+  return requireAnyAdminPermission([permission]);
+}
+
+function requireAnyAdminPermission(
+  required: readonly AdminPermission[]
+): RequestHandler {
+  return (_request, response, next): void => {
+    const permissions = currentUser(response).adminPermissions;
+    if (
+      permissions === undefined ||
+      permissions === null ||
+      required.some((permission) => permissions.includes(permission))
+    ) {
+      next();
+      return;
+    }
+    response.status(403).json({ error: "You do not have access to this action." });
+  };
+}
+
+function indiaDate(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  return `${parts.find((part) => part.type === "year")?.value}-${parts.find((part) => part.type === "month")?.value}-${parts.find((part) => part.type === "day")?.value}`;
+}
 
 app.get("/api/health", (_request, response) => response.json({ ok: true }));
 
@@ -245,6 +295,8 @@ app.get("/api/markets", async (_request, response) => {
           phase: bettingPhase(today, market, day),
           rateCard: market.rateCard,
           limits: market.limits,
+          jodiChartUrl: market.jodiChartUrl ?? "",
+          pannaChartUrl: market.pannaChartUrl ?? "",
           recentChart: recent
             .filter((row) => row.openPanna && row.closePanna)
             .map((row) => ({
@@ -324,6 +376,36 @@ app.post("/api/me/password", playerAuth, async (request, response) => {
   }
 });
 
+app.post("/api/me/fcm-token", playerAuth, async (request, response) => {
+  try {
+    const user = currentUser(response);
+    const input = z
+      .object({
+        token: z.string().trim().min(10).max(512),
+        platform: z.enum(["android", "ios"]).default("android"),
+      })
+      .parse(request.body);
+    await registerFcmToken(data, user._id, input.token, input.platform);
+    response.status(204).end();
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.delete("/api/me/fcm-token", playerAuth, async (request, response) => {
+  try {
+    const input = z
+      .object({
+        token: z.string().trim().min(10).max(512),
+      })
+      .parse(request.body);
+    await removeFcmToken(data, input.token);
+    response.status(204).end();
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
 app.post("/api/bets", playerAuth, async (request, response) => {
   try {
     const body = z
@@ -392,13 +474,123 @@ app.get("/api/me/passbook", playerAuth, async (_request, response) => {
   }
 });
 
-app.get("/api/admin/session", adminAuth, (_request, response) =>
-  response.json({ email: currentUser(response).email })
+app.post("/api/me/payments/pay0", playerAuth, async (request, response) => {
+  try {
+    const { amountRupees } = z
+      .object({ amountRupees: z.number().int().positive().max(1_000_000) })
+      .parse(request.body);
+    const payment = await createPay0Payment(
+      data,
+      currentUser(response),
+      amountRupees * 100
+    );
+    response.status(201).json(payment);
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.get(
+  "/api/me/payments/pay0/:orderId",
+  playerAuth,
+  async (request, response) => {
+    try {
+      const orderId = z.string().min(12).max(64).parse(request.params.orderId);
+      response.json(
+        await reconcileUserPayment(
+          data,
+          currentUser(response)._id,
+          orderId
+        )
+      );
+    } catch (error) {
+      handleError(error, response);
+    }
+  }
 );
+
+app.post("/api/payments/pay0/webhook", async (request, response) => {
+  const parsed = z
+    .object({
+      order_id: z
+        .string()
+        .min(12)
+        .max(64)
+        .regex(/^[A-Za-z0-9_-]+$/),
+      status: z.string().min(1).max(32),
+      hash: z.string().regex(/^[\da-f]{64}$/i),
+    })
+    .safeParse(request.body);
+  if (!parsed.success) {
+    response.status(400).send("Invalid webhook.");
+    return;
+  }
+  try {
+    if (
+      !verifyPay0WebhookSignature(parsed.data.order_id, parsed.data.hash)
+    ) {
+      response.status(403).send("Invalid signature.");
+      return;
+    }
+    const payment = await reconcilePay0Payment(data, parsed.data.order_id);
+    if (
+      parsed.data.status.toUpperCase() === "SUCCESS" &&
+      payment.status !== "paid"
+    ) {
+      response.status(503).send("Payment status is still being reconciled.");
+      return;
+    }
+    response.status(200).send("OK");
+  } catch (error) {
+    console.error("Pay0 webhook reconciliation failed:", error);
+    response.status(error instanceof ApiError ? error.status : 503).send(
+      error instanceof ApiError && error.status < 500
+        ? error.message
+        : "Verification failed."
+    );
+  }
+});
+
+app.get("/api/payments/pay0/redirect", async (request, response) => {
+  try {
+    const orderId = z
+      .string()
+      .min(12)
+      .max(64)
+      .regex(/^[A-Za-z0-9_-]+$/)
+      .parse(request.query.order_id);
+    const payment = await reconcilePay0Payment(data, orderId);
+    const scheme = (process.env.MOBILE_DEEP_LINK_SCHEME ?? "royalclubmatka")
+      .trim();
+    if (!/^[a-z][a-z0-9+.-]*$/i.test(scheme))
+      throw new ApiError(503, "Mobile redirect is not configured.");
+    response.redirect(
+      `${scheme}://payment/result?order_id=${encodeURIComponent(orderId)}&status=${payment.status}`
+    );
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.get("/api/admin/session", adminAuth, (_request, response) => {
+  const user = currentUser(response);
+  response.json({
+    email: user.email,
+    name: user.name ?? "",
+    permissions: user.adminPermissions ?? [...ADMIN_PERMISSIONS],
+  });
+});
 
 app.get("/api/admin/dashboard", adminAuth, async (_request, response) => {
   try {
-    const [users, markets, bets, results] = await Promise.all([
+    const [[financialRows], users, markets, bets, results] = await Promise.all([
+      sqlPool.execute<RowDataPacket[]>(
+        `SELECT
+          COALESCE((SELECT SUM(total_stake_paise) FROM bets WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))), 0) AS today_bid_paise,
+            COALESCE((SELECT SUM(amount_paise) FROM wallet_entries WHERE kind = 'adjustment' AND amount_paise > 0 AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))), 0) AS today_deposit_paise,
+            COALESCE((SELECT -SUM(amount_paise) FROM wallet_entries WHERE kind = 'adjustment' AND amount_paise < 0 AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))), 0) AS today_withdrawal_paise,
+          COALESCE((SELECT SUM(balance_paise) FROM users WHERE role = 'player'), 0) AS wallet_balance_paise`
+      ),
       data.users.countDocuments({ role: "player" }),
       data.markets.countDocuments(),
       data.bets.countDocuments(),
@@ -409,13 +601,23 @@ app.get("/api/admin/dashboard", adminAuth, async (_request, response) => {
         ],
       }),
     ]);
-    response.json({ users, markets, bets, results });
+    const financials = financialRows[0] as RowDataPacket | undefined;
+    response.json({
+      users,
+      markets,
+      bets,
+      results,
+      todayBidPaise: Number(financials?.today_bid_paise ?? 0),
+      todayDepositPaise: Number(financials?.today_deposit_paise ?? 0),
+      todayWithdrawalPaise: Number(financials?.today_withdrawal_paise ?? 0),
+      walletBalancePaise: Number(financials?.wallet_balance_paise ?? 0),
+    });
   } catch (error) {
     handleError(error, response);
   }
 });
 
-app.get("/api/admin/users", adminAuth, async (request, response) => {
+app.get("/api/admin/users", adminAuth, requireAdminPermission("users"), async (request, response) => {
   try {
     const page = Math.max(1, Math.min(100000, Number(request.query.page) || 1));
     const users = await data.users
@@ -430,7 +632,7 @@ app.get("/api/admin/users", adminAuth, async (request, response) => {
   }
 });
 
-app.patch("/api/admin/users/:id", adminAuth, async (request, response) => {
+app.patch("/api/admin/users/:id", adminAuth, requireAdminPermission("users"), async (request, response) => {
   try {
     const id = objectIdSchema.parse(request.params.id);
     const { disabled } = z
@@ -451,6 +653,7 @@ app.patch("/api/admin/users/:id", adminAuth, async (request, response) => {
 app.post(
   "/api/admin/users/:id/wallet",
   adminAuth,
+  requireAdminPermission("transactions"),
   async (request, response) => {
     try {
       const id = objectIdSchema.parse(request.params.id);
@@ -460,12 +663,42 @@ app.post(
           referenceId: z.string().min(6).max(100),
         })
         .parse(request.body);
+      const targetUserId = new ObjectId(id);
       await adjustWallet(
         data,
-        new ObjectId(id),
+        targetUserId,
         input.amountPaise,
         input.referenceId
       );
+      const formattedAmount = (Math.abs(input.amountPaise) / 100).toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      if (input.amountPaise > 0) {
+        await sendUserPushNotification(
+          data,
+          targetUserId,
+          "Wallet Recharged 💰",
+          `₹${formattedAmount} has been credited to your wallet. Ref: ${input.referenceId}`,
+          {
+            type: "wallet_recharge",
+            amountPaise: String(input.amountPaise),
+            referenceId: input.referenceId,
+          }
+        );
+      } else if (input.amountPaise < 0) {
+        await sendUserPushNotification(
+          data,
+          targetUserId,
+          "Wallet Withdrawal 💸",
+          `₹${formattedAmount} has been debited from your wallet. Ref: ${input.referenceId}`,
+          {
+            type: "wallet_withdraw",
+            amountPaise: String(input.amountPaise),
+            referenceId: input.referenceId,
+          }
+        );
+      }
       response.status(204).end();
     } catch (error) {
       handleError(error, response);
@@ -473,9 +706,32 @@ app.post(
   }
 );
 
-app.get("/api/admin/markets", adminAuth, async (_request, response) => {
+app.get("/api/admin/markets", adminAuth, requireAnyAdminPermission(["markets", "results"]), async (_request, response) => {
   try {
     response.json(await data.markets.find().sort({ openTime: 1 }).toArray());
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.get("/api/admin/users/:id/report", adminAuth, requireAdminPermission("users"), async (request, response) => {
+  try {
+    const userId = new ObjectId(objectIdSchema.parse(request.params.id));
+    const user = await data.users.findOne({ _id: userId, role: "player" }, { projection: { passwordHash: 0 } });
+    if (!user) throw new ApiError(404, "User not found.");
+    const [rows] = await sqlPool.execute<RowDataPacket[]>(
+      `SELECT
+        COALESCE((SELECT SUM(total_stake_paise) FROM bets WHERE user_id = ? AND DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) = DATE(CONVERT_TZ(NOW(), '+00:00', '+05:30'))), 0) AS today_bid_paise,
+        COALESCE((SELECT SUM(amount_paise) FROM wallet_entries WHERE user_id = ? AND kind = 'adjustment' AND amount_paise > 0), 0) AS deposits_paise,
+        COALESCE((SELECT -SUM(amount_paise) FROM wallet_entries WHERE user_id = ? AND kind = 'adjustment' AND amount_paise < 0), 0) AS withdrawals_paise`,
+      [userId.toHexString(), userId.toHexString(), userId.toHexString()]
+    );
+    response.json({
+      user,
+      todayBidPaise: Number(rows[0]?.today_bid_paise ?? 0),
+      depositsPaise: Number(rows[0]?.deposits_paise ?? 0),
+      withdrawalsPaise: Number(rows[0]?.withdrawals_paise ?? 0),
+    });
   } catch (error) {
     handleError(error, response);
   }
@@ -493,6 +749,8 @@ const marketSchema = z.object({
   timezone: z.string().default("Asia/Kolkata"),
   cutoffMinutes: z.number().int().min(0).max(120).default(10),
   active: z.boolean().default(true),
+  jodiChartUrl: z.string().max(500).optional(),
+  pannaChartUrl: z.string().max(500).optional(),
   rateCard: z
     .object({
       single: rate,
@@ -512,7 +770,7 @@ const marketSchema = z.object({
     .default(DEFAULT_STAKE_LIMITS),
 });
 
-app.post("/api/admin/markets", adminAuth, async (request, response) => {
+app.post("/api/admin/markets", adminAuth, requireAdminPermission("markets"), async (request, response) => {
   try {
     const input = marketSchema.parse(request.body);
     new Intl.DateTimeFormat("en", { timeZone: input.timezone });
@@ -526,7 +784,7 @@ app.post("/api/admin/markets", adminAuth, async (request, response) => {
   }
 });
 
-app.patch("/api/admin/markets/:id", adminAuth, async (request, response) => {
+app.patch("/api/admin/markets/:id", adminAuth, requireAdminPermission("markets"), async (request, response) => {
   try {
     const id = objectIdSchema.parse(request.params.id);
     const input = marketSchema.partial().parse(request.body);
@@ -551,7 +809,7 @@ app.patch("/api/admin/markets/:id", adminAuth, async (request, response) => {
   }
 });
 
-app.post("/api/admin/results/declare", adminAuth, async (request, response) => {
+app.post("/api/admin/results/declare", adminAuth, requireAdminPermission("results"), async (request, response) => {
   try {
     const input = z
       .object({
@@ -561,21 +819,45 @@ app.post("/api/admin/results/declare", adminAuth, async (request, response) => {
         panna: z.string().regex(/^\d{3}$/),
       })
       .parse(request.body);
-    response.json(
-      await declareResult(
-        data,
-        new ObjectId(input.marketId),
-        input.date,
-        input.side,
-        input.panna
-      )
+    const marketObjectId = new ObjectId(input.marketId);
+    const result = await declareResult(
+      data,
+      marketObjectId,
+      input.date,
+      input.side,
+      input.panna
     );
+    const market = await data.markets.findOne({ _id: marketObjectId });
+    const marketName = market?.name ?? "Market";
+    const sideLabel = input.side === "open" ? "Open" : "Close";
+    const digit = (Number(input.panna[0]) + Number(input.panna[1]) + Number(input.panna[2])) % 10;
+    const notificationTitle = `${marketName} Result Declared! 🎯`;
+    const notificationBody = `${sideLabel}: ${input.panna}-${digit} (${input.date})`;
+    await Promise.all([
+      sendTopicPushNotification("results", notificationTitle, notificationBody, {
+        type: "result_declared",
+        marketId: input.marketId,
+        side: input.side,
+        panna: input.panna,
+        digit: String(digit),
+        date: input.date,
+      }),
+      sendTopicPushNotification("all", notificationTitle, notificationBody, {
+        type: "result_declared",
+        marketId: input.marketId,
+        side: input.side,
+        panna: input.panna,
+        digit: String(digit),
+        date: input.date,
+      }),
+    ]);
+    response.json(result);
   } catch (error) {
     handleError(error, response);
   }
 });
 
-app.post("/api/admin/results/reverse", adminAuth, async (request, response) => {
+app.post("/api/admin/results/reverse", adminAuth, requireAdminPermission("results"), async (request, response) => {
   try {
     const input = z
       .object({
@@ -597,7 +879,7 @@ app.post("/api/admin/results/reverse", adminAuth, async (request, response) => {
   }
 });
 
-app.post("/api/admin/results/cancel", adminAuth, async (request, response) => {
+app.post("/api/admin/results/cancel", adminAuth, requireAdminPermission("results"), async (request, response) => {
   try {
     const input = z
       .object({ marketId: objectIdSchema, date: dateSchema })
@@ -614,7 +896,7 @@ app.post("/api/admin/results/cancel", adminAuth, async (request, response) => {
   }
 });
 
-app.get("/api/admin/results/history", adminAuth, async (request, response) => {
+app.get("/api/admin/results/history", adminAuth, requireAdminPermission("results"), async (request, response) => {
   try {
     const page = Math.max(1, Math.min(100000, Number(request.query.page) || 1));
     const days = await data.days
@@ -634,6 +916,370 @@ app.get("/api/admin/results/history", adminAuth, async (request, response) => {
             : "—",
       }))
     );
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.get("/api/admin/reports/markets", adminAuth, requireAdminPermission("reports"), async (request, response) => {
+  try {
+    const date = request.query.date
+      ? dateSchema.parse(request.query.date)
+      : indiaDate();
+    const markets = await data.markets.find().sort({ openTime: 1 }).toArray();
+    const bets = await data.bets.find({ date }).toArray();
+    response.json(
+      markets.map((market) => {
+        const rows = bets.filter((bet) => bet.marketId.equals(market._id));
+        const bidPaise = rows.reduce((sum, bet) => sum + bet.totalStakePaise, 0);
+        const winningPaise = rows.reduce(
+          (sum, bet) => sum + bet.slips.reduce((total, slip) => total + (slip.winningPaise ?? 0), 0),
+          0
+        );
+        return {
+          marketId: market._id,
+          marketName: market.name,
+          bidPaise,
+          winningPaise,
+          profitPaise: bidPaise - winningPaise,
+          winners: new Set(
+            rows
+              .filter((bet) => bet.slips.some((slip) => slip.winningPaise > 0))
+              .map((bet) => bet.userId.toHexString())
+          ).size,
+        };
+      })
+    );
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.get("/api/admin/reports/winners", adminAuth, requireAdminPermission("reports"), async (request, response) => {
+  try {
+    const date = request.query.date
+      ? dateSchema.parse(request.query.date)
+      : indiaDate();
+    const bets = await data.bets
+      .find({ date })
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .toArray();
+    const winningBets = bets.filter((bet) =>
+      bet.slips.some((slip) => slip.winningPaise > 0)
+    );
+    const userIds = [...new Set(winningBets.map((bet) => bet.userId.toHexString()))];
+    const marketIds = [...new Set(winningBets.map((bet) => bet.marketId.toHexString()))];
+    const [users, markets] = await Promise.all([
+      data.users.find({ _id: { $in: userIds.map((id) => new ObjectId(id)) } }).toArray(),
+      data.markets.find({ _id: { $in: marketIds.map((id) => new ObjectId(id)) } }).toArray(),
+    ]);
+    const usersById = new Map(users.map((user) => [user._id.toHexString(), user]));
+    const marketsById = new Map(markets.map((market) => [market._id.toHexString(), market]));
+    response.json(
+      winningBets.map((bet) => ({
+        _id: bet._id,
+        userId: bet.userId,
+        userName: usersById.get(bet.userId.toHexString())?.name ?? "Player",
+        userPhone: usersById.get(bet.userId.toHexString())?.phone ?? "",
+        marketName: marketsById.get(bet.marketId.toHexString())?.name ?? "Market",
+        date: bet.date,
+        winningPaise: bet.slips.reduce((sum, slip) => sum + slip.winningPaise, 0),
+        createdAt: bet.createdAt,
+      }))
+    );
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.get("/api/admin/transactions", adminAuth, requireAdminPermission("transactions"), async (request, response) => {
+  try {
+    const type = z.enum(["all", "deposit", "withdrawal"]).default("all").parse(request.query.type);
+    const typeSql =
+      type === "deposit"
+        ? "AND e.kind = 'adjustment' AND e.amount_paise > 0"
+        : type === "withdrawal"
+        ? "AND e.kind = 'adjustment' AND e.amount_paise < 0"
+        : "";
+    const [rows] = await sqlPool.execute<RowDataPacket[]>(
+      `SELECT e.id, e.user_id, COALESCE(u.name, u.phone, u.email) AS user_name, u.phone,
+              e.amount_paise, e.balance_after_paise, e.kind, e.reference_id, e.created_at
+       FROM wallet_entries e
+       INNER JOIN users u ON u.id = e.user_id
+       WHERE u.role = 'player' ${typeSql}
+       ORDER BY e.created_at DESC
+       LIMIT 500`
+    );
+    response.json(
+      rows.map((row) => ({
+        _id: row.id,
+        userId: row.user_id,
+        userName: row.user_name,
+        phone: row.phone,
+        amountPaise: Number(row.amount_paise),
+        balanceAfterPaise: Number(row.balance_after_paise),
+        kind: row.kind,
+        referenceId: row.reference_id,
+        createdAt: row.created_at,
+        category:
+          row.kind === "adjustment"
+            ? Number(row.amount_paise) >= 0
+              ? "deposit"
+              : "withdrawal"
+            : row.kind === "win" || row.kind === "refund"
+            ? "credit"
+            : "bet",
+      }))
+    );
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+const settingsSchema = z.object({
+  minDepositPaise: z.number().int().min(100).max(100_000_000),
+  minWithdrawalPaise: z.number().int().min(100).max(100_000_000),
+  maxWithdrawalPaise: z.number().int().min(100).max(1_000_000_000),
+  withdrawalStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  withdrawalEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  firstDepositBonusPercent: z.number().int().min(0).max(100),
+  referralBonusPaise: z.number().int().min(0).max(100_000_000),
+});
+
+app.get("/api/settings", async (_request, response) => {
+  try {
+    response.json(await data.settings.findOne({}));
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.put("/api/admin/settings", adminAuth, requireAdminPermission("settings"), async (request, response) => {
+  try {
+    const input = settingsSchema.parse(request.body);
+    if (input.minWithdrawalPaise > input.maxWithdrawalPaise)
+      throw new ApiError(400, "Minimum withdrawal cannot exceed maximum withdrawal.");
+    const current = await data.settings.findOne({});
+    if (!current) throw new ApiError(500, "Application settings are not initialized.");
+    response.json(
+      await data.settings.findOneAndUpdate(
+        { _id: current._id },
+        { $set: input },
+        { returnDocument: "after" }
+      )
+    );
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+const bannerSchema = z.object({
+  title: z.string().trim().min(2).max(120),
+  imageData: z
+    .string()
+    .max(2_000_000)
+    .refine(
+      (value) => /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value),
+      "Upload a PNG, JPEG, or WebP image."
+    ),
+  linkUrl: z.union([z.string().url().max(500), z.literal("")]).optional(),
+  active: z.boolean().default(true),
+  sortOrder: z.number().int().min(0).max(999).default(0),
+});
+
+app.get("/api/banners", async (_request, response) => {
+  try {
+    const banners = await data.banners.find({ active: true }).sort({ sortOrder: 1, createdAt: -1 }).limit(20).toArray();
+    response.json(banners);
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.get("/api/admin/banners", adminAuth, requireAdminPermission("content"), async (_request, response) => {
+  try {
+    response.json(await data.banners.find().sort({ sortOrder: 1, createdAt: -1 }).toArray());
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.post("/api/admin/banners", adminAuth, requireAdminPermission("content"), async (request, response) => {
+  try {
+    const input = bannerSchema.parse(request.body);
+    const banner = { _id: new ObjectId(), ...input, createdAt: new Date() };
+    await data.banners.insertOne(banner);
+    response.status(201).json(banner);
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.patch("/api/admin/banners/:id", adminAuth, requireAdminPermission("content"), async (request, response) => {
+  try {
+    const id = new ObjectId(objectIdSchema.parse(request.params.id));
+    const input = bannerSchema.partial().parse(request.body);
+    const banner = await data.banners.findOneAndUpdate(
+      { _id: id },
+      { $set: input },
+      { returnDocument: "after" }
+    );
+    if (!banner) throw new ApiError(404, "Banner not found.");
+    response.json(banner);
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.get("/api/notifications", async (_request, response) => {
+  try {
+    response.json(
+      await data.notifications
+        .find({ active: true })
+        .sort({ createdAt: -1 })
+        .limit(30)
+        .toArray()
+    );
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.post("/api/admin/notifications", adminAuth, requireAdminPermission("content"), async (request, response) => {
+  try {
+    const input = z.object({
+      title: z.string().trim().min(2).max(160),
+      description: z.string().trim().min(2).max(2000),
+      topic: z.string().trim().min(1).max(80).default("all"),
+    }).parse(request.body);
+    const notification = {
+      _id: new ObjectId(),
+      title: input.title,
+      description: input.description,
+      topic: input.topic,
+      active: true,
+      createdAt: new Date(),
+    };
+    await data.notifications.insertOne(notification);
+    await sendTopicPushNotification(
+      input.topic,
+      input.title,
+      input.description,
+      {
+        type: "admin_notification",
+        notificationId: notification._id.toString(),
+        topic: input.topic,
+      }
+    );
+    response.status(201).json({
+      ...notification,
+      firebaseLive: isFirebaseConfigured(),
+    });
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.get("/api/admin/notifications/status", adminAuth, requireAdminPermission("content"), (_request, response) => {
+  response.json({
+    firebaseConfigured: isFirebaseConfigured(),
+  });
+});
+
+app.get("/api/admin/notifications", adminAuth, requireAdminPermission("content"), async (_request, response) => {
+  try {
+    response.json(await data.notifications.find().sort({ createdAt: -1 }).limit(100).toArray());
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+const subAdminSchema = z.object({
+  email: z.string().email().transform((value) => value.toLowerCase().trim()),
+  name: z.string().trim().min(2).max(80),
+  password: z.string().min(12).max(128),
+  permissions: z.array(z.enum(ADMIN_PERMISSIONS)).min(1).max(ADMIN_PERMISSIONS.length),
+});
+
+app.get("/api/admin/staff", adminAuth, requireAdminPermission("staff"), async (_request, response) => {
+  try {
+    const staff = await data.users
+      .find({ role: "admin" }, { projection: { passwordHash: 0 } })
+      .sort({ createdAt: -1 })
+      .toArray();
+    response.json(staff);
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.post("/api/admin/staff", adminAuth, requireAdminPermission("staff"), async (request, response) => {
+  try {
+    const input = subAdminSchema.parse(request.body);
+    const staff = {
+      _id: new ObjectId(),
+      email: input.email,
+      name: input.name,
+      passwordHash: await hashPassword(input.password),
+      passwordVersion: 0,
+      role: "admin" as const,
+      adminPermissions: [...new Set(input.permissions)],
+      disabled: false,
+      balancePaise: 0,
+      createdAt: new Date(),
+    };
+    await data.users.insertOne(staff);
+    response.status(201).json({ ...staff, passwordHash: undefined });
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.patch("/api/admin/staff/:id", adminAuth, requireAdminPermission("staff"), async (request, response) => {
+  try {
+    const id = new ObjectId(objectIdSchema.parse(request.params.id));
+    const input = z.object({
+      disabled: z.boolean().optional(),
+      permissions: z.array(z.enum(ADMIN_PERMISSIONS)).min(1).optional(),
+    }).parse(request.body);
+    const target = await data.users.findOne({ _id: id, role: "admin" });
+    if (!target) throw new ApiError(404, "Staff account not found.");
+    if (!target.adminPermissions) throw new ApiError(400, "Primary admin access cannot be changed.");
+    const changes: { disabled?: boolean; adminPermissions?: AdminPermission[] } = {};
+    if (input.disabled !== undefined) changes.disabled = input.disabled;
+    if (input.permissions !== undefined) changes.adminPermissions = [...new Set(input.permissions)];
+    if (Object.keys(changes).length === 0)
+      throw new ApiError(400, "No changes provided.");
+    const staff = await data.users.findOneAndUpdate(
+      { _id: id },
+      { $set: changes },
+      { returnDocument: "after", projection: { passwordHash: 0 } }
+    );
+    response.json(staff);
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.post("/api/admin/password", adminAuth, async (request, response) => {
+  try {
+    const input = z.object({
+      currentPassword: z.string(),
+      newPassword: z.string().min(12).max(128),
+    }).parse(request.body);
+    const user = currentUser(response);
+    if (!(await checkPassword(input.currentPassword, user.passwordHash)))
+      throw new ApiError(401, "Current password is incorrect.");
+    await data.users.updateOne(
+      { _id: user._id },
+      {
+        $set: { passwordHash: await hashPassword(input.newPassword) },
+        $inc: { passwordVersion: 1 },
+      }
+    );
+    response.clearCookie("admin_token", { path: "/api" });
+    response.status(204).end();
   } catch (error) {
     handleError(error, response);
   }

@@ -2,6 +2,7 @@ import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
+  TextareaHTMLAttributes,
 } from "react";
 
 export function Button({
@@ -39,6 +40,18 @@ export function Select({
     <label className="field">
       <span>{label}</span>
       <select {...props}>{children}</select>
+    </label>
+  );
+}
+
+export function Textarea({
+  label,
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string }): ReactNode {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <textarea {...props} />
     </label>
   );
 }

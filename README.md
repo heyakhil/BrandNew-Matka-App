@@ -8,3 +8,8 @@
 Run `npm test` in `packages/matka-rules`, `npm run test:integration` in `Server` with `MYSQL_TEST_DATABASE` set to a dedicated test database, and `npm run build` in `AdminPanel` to verify the game logic, transactional settlement, and admin build.
 
 No payment processor is configured. Player wallet credits are entered in AdminPanel with a payment reference; the mobile funds actions direct players to support.
+
+The AdminPanel groups dashboard, user and market management, results, reports,
+finance, content, and administration into submenus. It also manages app fund
+limits and bonuses, slider uploads, notifications, detailed transaction
+history, and permission-scoped sub-admin accounts.

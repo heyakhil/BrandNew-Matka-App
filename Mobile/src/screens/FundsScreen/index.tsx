@@ -20,7 +20,7 @@ interface FundsScreenProps {
   bankDetails: BankDetails;
   subView: FundsSubView;
   onSubViewChange: (view: FundsSubView) => void;
-  onAddFund: (amount: number) => void;
+  onAddFund: (amount: number) => Promise<void>;
   onWithdrawFund: (amount: number) => void;
   onSaveBankDetails: (details: BankDetails) => void;
   onSupportPress: () => void;
@@ -101,9 +101,9 @@ export const FundsScreen: React.FC<FundsScreenProps> = ({
         <AddFundForm
           profile={profile}
           balanceRupees={balanceRupees}
-          onSubmit={amount => {
-            onAddFund(amount);
-            onSubViewChange('menu');
+          onSubmit={async amount => {
+            await onAddFund(amount);
+            if (!live) onSubViewChange('menu');
           }}
         />
       );
@@ -154,7 +154,7 @@ export const FundsScreen: React.FC<FundsScreenProps> = ({
           style={styles.container}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}>
-          {MENU_ITEMS.filter(item => !live || item.destination === 'depositHistory' || item.destination === 'withdrawHistory').map(({ destination, ...item }) => (
+          {MENU_ITEMS.map(({ destination, ...item }) => (
             <MenuListItem
               key={destination}
               {...item}

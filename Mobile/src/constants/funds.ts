@@ -1,4 +1,13 @@
-export const QUICK_ADD_AMOUNTS: number[] = [110, 200, 300, 500, 1000, 1500, 2000];
+export const QUICK_ADD_AMOUNTS: number[] = [
+  ...(__DEV__ ? [1] : []),
+  110,
+  200,
+  300,
+  500,
+  1000,
+  1500,
+  2000,
+];
 
 export const MIN_DEPOSIT_RUPEES = 100;
 export const MIN_WITHDRAW_RUPEES = 500;

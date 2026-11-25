@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   api,
+  rupees,
+  type AdminPermission,
   type Dashboard,
   type Market,
   type ResultDay,
@@ -8,15 +10,89 @@ import {
 } from "./api";
 import { Button, Input, Select } from "./components/atoms";
 import { Panel } from "./components/Panel";
+import {
+  BannersView,
+  NotificationsView,
+  PasswordView,
+  ReportsView,
+  SettingsView,
+  StaffView,
+  TransactionsView,
+  UserReportDialog,
+} from "./components/organisms/AdminFeatures";
 
-type Tab = "dashboard" | "users" | "declare" | "history" | "markets";
-const tabs: Array<{ id: Tab; label: string }> = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "users", label: "User Management" },
-  { id: "declare", label: "Result Declare" },
-  { id: "history", label: "Result History" },
-  { id: "markets", label: "Markets" },
+type Tab =
+  | "dashboard"
+  | "users"
+  | "declare"
+  | "history"
+  | "markets"
+  | "marketProfit"
+  | "winners"
+  | "transactions"
+  | "deposits"
+  | "withdrawals"
+  | "banners"
+  | "notifications"
+  | "settings"
+  | "staff"
+  | "password";
+type NavItem = { id: Tab; label: string; permission?: AdminPermission };
+type NavGroup = { label: string; items: NavItem[] };
+const navGroups: NavGroup[] = [
+  { label: "Overview", items: [{ id: "dashboard", label: "Dashboard" }] },
+  {
+    label: "Users & Markets",
+    items: [
+      { id: "users", label: "User Management", permission: "users" },
+      { id: "markets", label: "Markets & Charts", permission: "markets" },
+    ],
+  },
+  {
+    label: "Results",
+    items: [
+      { id: "declare", label: "Manual Result Entry", permission: "results" },
+      { id: "history", label: "Result History", permission: "results" },
+      { id: "winners", label: "Win History", permission: "reports" },
+      { id: "marketProfit", label: "Market-wise Reports", permission: "reports" },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      { id: "transactions", label: "Transactions", permission: "transactions" },
+      { id: "deposits", label: "Deposit History", permission: "transactions" },
+      { id: "withdrawals", label: "Withdrawal History", permission: "transactions" },
+    ],
+  },
+  {
+    label: "Content",
+    items: [
+      { id: "banners", label: "Sliders & Banners", permission: "content" },
+      { id: "notifications", label: "Notifications", permission: "content" },
+    ],
+  },
+  {
+    label: "Administration",
+    items: [
+      { id: "settings", label: "App, Bonus & Referral", permission: "settings" },
+      { id: "staff", label: "Sub-admin Access", permission: "staff" },
+      { id: "password", label: "Change Password" },
+    ],
+  },
 ];
+const pageTitle = (tab: Tab): string =>
+  navGroups.flatMap((group) => group.items).find((item) => item.id === tab)?.label ??
+  "Dashboard";
+const validTabs = new Set<Tab>(
+  navGroups.flatMap((group) => group.items.map((item) => item.id))
+);
+
+function tabFromLocation(): Tab {
+  const raw = window.location.hash.replace(/^#\/?/, "");
+  const value = raw === "notification" ? "notifications" : raw;
+  return validTabs.has(value as Tab) ? (value as Tab) : "dashboard";
+}
 
 function todayInIndia(): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -32,7 +108,7 @@ function todayInIndia(): string {
 
 export function App() {
   const [email, setEmail] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("dashboard");
+  const [tab, setTab] = useState<Tab>(tabFromLocation);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [markets, setMarkets] = useState<Market[]>([]);
@@ -42,15 +118,29 @@ export function App() {
   const [refresh, setRefresh] = useState(0);
   const [userPage, setUserPage] = useState(1);
   const [historyPage, setHistoryPage] = useState(1);
+  const [permissions, setPermissions] = useState<AdminPermission[]>([]);
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const load = useCallback(async (): Promise<void> => {
     try {
-      const session = await api<{ email: string }>("/admin/session");
+      const session = await api<{
+        email: string;
+        permissions: AdminPermission[];
+      }>("/admin/session");
       setEmail(session.email);
+      setPermissions(session.permissions);
       const [marketRows, userRows, resultRows, stats] = await Promise.all([
-        api<Market[]>("/admin/markets"),
-        api<User[]>(`/admin/users?page=${userPage}`),
-        api<ResultDay[]>(`/admin/results/history?page=${historyPage}`),
+        session.permissions.includes("markets") ||
+        session.permissions.includes("results")
+          ? api<Market[]>("/admin/markets")
+          : Promise.resolve([]),
+        session.permissions.includes("users")
+          ? api<User[]>(`/admin/users?page=${userPage}`)
+          : Promise.resolve([]),
+        session.permissions.includes("results")
+          ? api<ResultDay[]>(`/admin/results/history?page=${historyPage}`)
+          : Promise.resolve([]),
         api<Dashboard>("/admin/dashboard"),
       ]);
       setMarkets(marketRows);
@@ -80,15 +170,31 @@ export function App() {
     void load();
   }, [load, refresh]);
 
-  const changed = (message: string): void => {
+  useEffect(() => {
+    const onHashChange = (): void => {
+      setTab(tabFromLocation());
+      setError("");
+      setNotice("");
+    };
+    window.addEventListener("hashchange", onHashChange);
+    if (!window.location.hash) window.history.replaceState(null, "", "#/dashboard");
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("menuOpen", mobileMenuOpen);
+    return () => document.body.classList.remove("menuOpen");
+  }, [mobileMenuOpen]);
+
+  const changed = useCallback((message: string): void => {
     setNotice(message);
     setError("");
     setRefresh((value) => value + 1);
-  };
-  const failed = (cause: unknown): void => {
+  }, []);
+  const failed = useCallback((cause: unknown): void => {
     setError(cause instanceof Error ? cause.message : "Request failed.");
     setNotice("");
-  };
+  }, []);
 
   async function logout(): Promise<void> {
     try {
@@ -111,28 +217,56 @@ export function App() {
 
   return (
     <div className="shell">
-      <aside className="sidebar">
+      <button
+        type="button"
+        className={mobileMenuOpen ? "sidebarBackdrop visible" : "sidebarBackdrop"}
+        aria-label="Close navigation"
+        onClick={() => setMobileMenuOpen(false)}
+      />
+      <aside className={mobileMenuOpen ? "sidebar mobileOpen" : "sidebar"}>
         <div className="brand">
-          <span className="brandIcon">R</span>
+          <img className="brandIcon" src="/royal-club-logo.png" alt="Royal Club" />
           <div>
             <strong>Royal Club</strong>
             <small>Admin Panel</small>
           </div>
+          <Button
+            className="closeSidebar"
+            aria-label="Close navigation"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            ×
+          </Button>
         </div>
         <nav>
-          {tabs.map((item) => (
-            <Button
-              key={item.id}
-              className={tab === item.id ? "nav active" : "nav"}
-              onClick={() => {
-                setTab(item.id);
-                setError("");
-                setNotice("");
-              }}
-            >
-              {item.label}
-            </Button>
-          ))}
+          {navGroups.map((group) => {
+            const items = group.items.filter(
+              (item) => !item.permission || permissions.includes(item.permission)
+            );
+            if (items.length === 0) return null;
+            return (
+              <section className="navGroup" key={group.label}>
+                <div className="navGroupToggle">
+                  <span>{group.label}</span>
+                </div>
+                {items.map((item) => (
+                  <a
+                    key={item.id}
+                    className={tab === item.id ? "nav active" : "nav"}
+                    href={`#/${item.id}`}
+                    onClick={() => {
+                      setTab(item.id);
+                      setError("");
+                      setNotice("");
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    {item.label}
+                  </a>
+                ))}
+              </section>
+            );
+          })}
         </nav>
         <div className="account">
           <small>{email}</small>
@@ -141,9 +275,17 @@ export function App() {
       </aside>
       <main className="main">
         <header>
+          <Button
+            className="mobileMenuButton"
+            aria-label="Open navigation"
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen(true)}
+          >
+            ☰
+          </Button>
           <div>
             <small>ROYAL CLUB CONTROL</small>
-            <h1>{tabs.find((item) => item.id === tab)?.label}</h1>
+            <h1>{pageTitle(tab)}</h1>
           </div>
           <span className="live">● Live</span>
         </header>
@@ -165,6 +307,7 @@ export function App() {
             onPage={setUserPage}
             onChanged={changed}
             onError={failed}
+            onDetails={setDetailUserId}
           />
         )}
         {tab === "declare" && (
@@ -182,6 +325,34 @@ export function App() {
         )}
         {tab === "markets" && (
           <MarketsView markets={markets} onChanged={changed} onError={failed} />
+        )}
+        {(tab === "marketProfit" || tab === "winners") && (
+          <ReportsView
+            type={tab === "marketProfit" ? "profit" : "winners"}
+            onChanged={changed}
+            onError={failed}
+          />
+        )}
+        {(tab === "transactions" || tab === "deposits" || tab === "withdrawals") && (
+          <TransactionsView
+            type={tab === "deposits" ? "deposit" : tab === "withdrawals" ? "withdrawal" : "all"}
+            onChanged={changed}
+            onError={failed}
+          />
+        )}
+        {tab === "banners" && <BannersView onChanged={changed} onError={failed} />}
+        {tab === "notifications" && <NotificationsView onChanged={changed} onError={failed} />}
+        {tab === "settings" && <SettingsView onChanged={changed} onError={failed} />}
+        {tab === "staff" && <StaffView onChanged={changed} onError={failed} />}
+        {tab === "password" && (
+          <PasswordView
+            onChanged={changed}
+            onError={failed}
+            onSignedOut={() => setEmail(null)}
+          />
+        )}
+        {detailUserId && (
+          <UserReportDialog userId={detailUserId} onClose={() => setDetailUserId(null)} />
         )}
       </main>
     </div>
@@ -213,7 +384,7 @@ function Login({ onSuccess }: { onSuccess: (email: string) => void }) {
     <div className="loginPage">
       <form className="loginCard" onSubmit={(event) => void submit(event)}>
         <div className="brand loginBrand">
-          <span className="brandIcon">R</span>
+          <img className="brandIcon" src="/royal-club-logo.png" alt="Royal Club" />
           <div>
             <strong>Royal Club</strong>
             <small>Admin Panel</small>
@@ -255,10 +426,14 @@ function DashboardView({ data }: { data: Dashboard | null }) {
     <div className="stats">
       {(
         [
-          ["Players", data?.users],
-          ["Markets", data?.markets],
-          ["Bets", data?.bets],
-          ["Result days", data?.results],
+          ["Players", data ? data.users.toLocaleString("en-IN") : undefined],
+          ["Markets", data ? data.markets.toLocaleString("en-IN") : undefined],
+          ["Today's bids", data ? rupees(data.todayBidPaise) : undefined],
+          ["Today's deposits", data ? rupees(data.todayDepositPaise) : undefined],
+          ["Today's withdrawals", data ? rupees(data.todayWithdrawalPaise) : undefined],
+          ["User wallet balance", data ? rupees(data.walletBalancePaise) : undefined],
+          ["Total bets", data ? data.bets.toLocaleString("en-IN") : undefined],
+          ["Result days", data ? data.results.toLocaleString("en-IN") : undefined],
         ] as const
       ).map(([label, value]) => (
         <Panel key={label} title={label}>
@@ -275,12 +450,14 @@ function UsersView({
   onPage,
   onChanged,
   onError,
+  onDetails,
 }: {
   users: User[];
   page: number;
   onPage: (page: number) => void;
   onChanged: (message: string) => void;
   onError: (cause: unknown) => void;
+  onDetails: (userId: string) => void;
 }) {
   async function toggle(user: User): Promise<void> {
     try {
@@ -352,6 +529,7 @@ function UsersView({
                   </span>
                 </td>
                 <td className="actions">
+                  <Button onClick={() => onDetails(user._id)}>View details</Button>
                   <Button onClick={() => void toggle(user)}>
                     {user.disabled ? "Enable" : "Disable"}
                   </Button>
@@ -601,12 +779,28 @@ function MarketsView({
   const [slug, setSlug] = useState("");
   const [openTime, setOpenTime] = useState("10:00");
   const [closeTime, setCloseTime] = useState("12:00");
+  const [editingMarket, setEditingMarket] = useState<Market | null>(null);
+  const editSectionRef = useRef<HTMLDivElement | null>(null);
+  const editMarket = (selected: Market): void => {
+    setEditingMarket(selected);
+    window.requestAnimationFrame(() => {
+      editSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     try {
       await api("/admin/markets", {
         method: "POST",
-        body: JSON.stringify({ name, slug, openTime, closeTime }),
+        body: JSON.stringify({
+          name,
+          slug,
+          openTime,
+          closeTime,
+        }),
       });
       setName("");
       setSlug("");
@@ -621,6 +815,21 @@ function MarketsView({
         method: "PATCH",
         body: JSON.stringify({ active: !market.active }),
       });
+      onChanged("Market updated.");
+    } catch (cause) {
+      onError(cause);
+    }
+  }
+  async function updateMarket(
+    marketId: string,
+    changes: Pick<Market, "name" | "slug" | "openTime" | "closeTime">
+  ): Promise<void> {
+    try {
+      await api(`/admin/markets/${marketId}`, {
+        method: "PATCH",
+        body: JSON.stringify(changes),
+      });
+      setEditingMarket(null);
       onChanged("Market updated.");
     } catch (cause) {
       onError(cause);
@@ -669,6 +878,15 @@ function MarketsView({
           </Button>
         </form>
       </Panel>
+      {editingMarket && (
+        <div ref={editSectionRef} className="editSection">
+          <MarketEditor
+            market={editingMarket}
+            onCancel={() => setEditingMarket(null)}
+            onSave={updateMarket}
+          />
+        </div>
+      )}
       <RateEditor markets={markets} onChanged={onChanged} onError={onError} />
       <Panel title="Configured markets">
         <div className="tableWrap">
@@ -679,28 +897,90 @@ function MarketsView({
                 <th>Open</th>
                 <th>Close</th>
                 <th>Status</th>
-                <th>Action</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {markets.map((market) => (
-                <tr key={market._id}>
-                  <td>{market.name}</td>
-                  <td>{market.openTime}</td>
-                  <td>{market.closeTime}</td>
-                  <td>{market.active ? "On" : "Off"}</td>
-                  <td>
-                    <Button onClick={() => void toggle(market)}>
-                      {market.active ? "Turn off" : "Turn on"}
-                    </Button>
-                  </td>
-                </tr>
+                <MarketRow
+                  key={market._id}
+                  market={market}
+                  onToggle={toggle}
+                  onEdit={editMarket}
+                />
               ))}
             </tbody>
           </table>
         </div>
       </Panel>
     </>
+  );
+}
+
+function MarketRow({
+  market,
+  onToggle,
+  onEdit,
+}: {
+  market: Market;
+  onToggle: (market: Market) => void;
+  onEdit: (market: Market) => void;
+}) {
+  return (
+    <tr>
+      <td>{market.name}</td>
+      <td>{market.openTime}</td>
+      <td>{market.closeTime}</td>
+      <td>{market.active ? "On" : "Off"}</td>
+      <td className="actions">
+        <Button onClick={() => onEdit(market)}>Edit</Button>
+        <Button onClick={() => void onToggle(market)}>
+          {market.active ? "Turn off" : "Turn on"}
+        </Button>
+      </td>
+    </tr>
+  );
+}
+
+function MarketEditor({
+  market,
+  onCancel,
+  onSave,
+}: {
+  market: Market;
+  onCancel: () => void;
+  onSave: (
+    marketId: string,
+    changes: Pick<Market, "name" | "slug" | "openTime" | "closeTime">
+  ) => Promise<void>;
+}) {
+  const [name, setName] = useState(market.name);
+  const [slug, setSlug] = useState(market.slug);
+  const [openTime, setOpenTime] = useState(market.openTime);
+  const [closeTime, setCloseTime] = useState(market.closeTime);
+  const [saving, setSaving] = useState(false);
+  const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await onSave(market._id, { name, slug, openTime, closeTime });
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Panel title={`Edit ${market.name}`}>
+      <form className="formGrid" onSubmit={(event) => void submit(event)}>
+        <Input label="Market name" required value={name} onChange={(event) => setName(event.target.value)} />
+        <Input label="Slug" required value={slug} onChange={(event) => setSlug(event.target.value)} />
+        <Input label="Open time" type="time" required value={openTime} onChange={(event) => setOpenTime(event.target.value)} />
+        <Input label="Close time" type="time" required value={closeTime} onChange={(event) => setCloseTime(event.target.value)} />
+        <div className="actions">
+          <Button type="submit" className="primary" disabled={saving}>{saving ? "Saving…" : "Save market"}</Button>
+          <Button onClick={onCancel}>Cancel</Button>
+        </div>
+      </form>
+    </Panel>
   );
 }
 

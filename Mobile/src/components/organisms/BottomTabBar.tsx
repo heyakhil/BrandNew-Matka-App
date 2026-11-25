@@ -8,6 +8,7 @@ import type { TabKey } from '../../types/matka';
 interface BottomTabBarProps {
   activeTab: TabKey;
   onTabPress: (key: TabKey) => void;
+  bottomInset?: number;
 }
 
 interface TabItem {
@@ -27,8 +28,16 @@ const TABS: TabItem[] = [
 export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   activeTab,
   onTabPress,
+  bottomInset = 0,
 }) => (
-  <View style={styles.bar}>
+  <View
+    style={[
+      styles.bar,
+      bottomInset > 0 && {
+        paddingBottom: bottomInset,
+        height: 64 + bottomInset,
+      },
+    ]}>
     {TABS.map(tab => {
       const focused = tab.key === activeTab;
 

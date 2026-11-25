@@ -1,30 +1,21 @@
-import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import {
-  Button,
-  DataTable,
-  Divider,
-  IconButton,
-  Modal,
-  Portal,
-  Surface,
-  Text,
-} from 'react-native-paper';
-import { APP_COLORS } from '../../theme/paperTheme';
+import React from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Divider, Icon, Modal, Portal, Surface, Text } from 'react-native-paper';
 import type { MarketItem } from '../../types/matka';
 
 interface MarketChartModalProps {
   visible: boolean;
   market: MarketItem | null;
   onDismiss: () => void;
+  onSelectChart: (market: MarketItem, mode: 'Jodi' | 'Panna') => void;
 }
 
 export const MarketChartModal: React.FC<MarketChartModalProps> = ({
   visible,
   market,
   onDismiss,
+  onSelectChart,
 }) => {
-  const [mode, setMode] = useState<'Jodi' | 'Panna'>('Jodi');
   if (!market) {
     return null;
   }
@@ -35,54 +26,45 @@ export const MarketChartModal: React.FC<MarketChartModalProps> = ({
         visible={visible}
         onDismiss={onDismiss}
         contentContainerStyle={styles.wrapper}>
-        <Surface style={styles.card} elevation={4}>
+        <Surface style={styles.card} elevation={3}>
           <View style={styles.header}>
-            <View>
-              <Text variant="titleMedium" style={styles.title}>
-                {market.name} {mode} Chart
-              </Text>
-              <Text variant="labelSmall" style={styles.sub}>
-                Open {market.openTime} • Close {market.closeTime}
-              </Text>
-            </View>
-            <IconButton
-              icon="close"
-              iconColor={APP_COLORS.textSecondary}
+            <View style={styles.headerSpacer} />
+            <Text style={styles.title} numberOfLines={1}>
+              {market.name.toUpperCase()} Charts
+            </Text>
+            <TouchableOpacity
+              style={styles.closeBtn}
               onPress={onDismiss}
-            />
+              activeOpacity={0.7}
+              accessibilityLabel="Close chart popup">
+              <Icon source="close" size={16} color="#4B5563" />
+            </TouchableOpacity>
           </View>
+
           <Divider style={styles.divider} />
 
-          <DataTable>
-            <DataTable.Header style={styles.tableHeader}>
-              <DataTable.Title textStyle={styles.colHead}>Date</DataTable.Title>
-              <DataTable.Title numeric textStyle={styles.colHead}>
-                {mode}
-              </DataTable.Title>
-            </DataTable.Header>
+          <View style={styles.content}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[styles.chartBtn, styles.jodiBtn]}
+              onPress={() => {
+                onDismiss();
+                onSelectChart(market, 'Jodi');
+              }}>
+              <Icon source="view-grid" size={22} color="#FFFFFF" />
+              <Text style={styles.btnText}>Jodi Chart</Text>
+            </TouchableOpacity>
 
-            {market.recentChart.map(row => (
-              <DataTable.Row key={row.date} style={styles.tableRow}>
-                <DataTable.Cell textStyle={styles.dateText}>
-                  {row.date}
-                </DataTable.Cell>
-                <DataTable.Cell numeric textStyle={styles.resultText}>
-                  {mode === 'Jodi' ? (row.result.split('-')[1] ?? '—') : `${row.result.split('-')[0] ?? '—'} / ${row.result.split('-')[2] ?? '—'}`}
-                </DataTable.Cell>
-              </DataTable.Row>
-            ))}
-          </DataTable>
-
-          <View style={styles.footer}>
-            <Button
-              mode="contained"
-              onPress={() => setMode('Jodi')}
-              buttonColor={APP_COLORS.accent}
-              textColor={APP_COLORS.onAccent}
-              labelStyle={styles.btnLabel}>
-              Jodi Chart
-            </Button>
-            <Button mode="outlined" onPress={() => setMode('Panna')} textColor={APP_COLORS.gradientStart}>Panna Chart</Button>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[styles.chartBtn, styles.pannaBtn]}
+              onPress={() => {
+                onDismiss();
+                onSelectChart(market, 'Panna');
+              }}>
+              <Icon source="card-multiple" size={22} color="#FFFFFF" />
+              <Text style={styles.btnText}>Panna Chart</Text>
+            </TouchableOpacity>
           </View>
         </Surface>
       </Modal>
@@ -92,55 +74,66 @@ export const MarketChartModal: React.FC<MarketChartModalProps> = ({
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginHorizontal: 20,
+    marginHorizontal: 24,
   },
   card: {
-    backgroundColor: APP_COLORS.secondary,
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: APP_COLORS.border,
+    borderColor: '#E5E7EB',
     overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingLeft: 16,
-    paddingRight: 6,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  headerSpacer: {
+    width: 28,
   },
   title: {
-    color: APP_COLORS.textPrimary,
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
     fontWeight: '800',
+    color: '#111827',
   },
-  sub: {
-    color: APP_COLORS.textSecondary,
+  closeBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
   },
   divider: {
-    backgroundColor: APP_COLORS.border,
+    backgroundColor: '#E5E7EB',
   },
-  tableHeader: {
-    borderBottomColor: APP_COLORS.border,
-  },
-  tableRow: {
-    borderBottomColor: APP_COLORS.border,
-  },
-  colHead: {
-    color: APP_COLORS.textSecondary,
-    fontWeight: '700',
-  },
-  dateText: {
-    color: APP_COLORS.textPrimary,
-  },
-  resultText: {
-    color: APP_COLORS.accent,
-    fontWeight: '800',
-  },
-  footer: {
+  content: {
     padding: 16,
-    gap: 8,
+    gap: 12,
   },
-  btnLabel: {
-    fontWeight: '800',
+  chartBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 52,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  jodiBtn: {
+    backgroundColor: '#273896',
+  },
+  pannaBtn: {
+    backgroundColor: '#F58220',
+  },
+  btnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

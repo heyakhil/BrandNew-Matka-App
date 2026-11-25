@@ -23,6 +23,7 @@ export interface User {
   passwordHash: string;
   passwordVersion?: number;
   role: "admin" | "player";
+  adminPermissions?: AdminPermission[] | null;
   disabled: boolean;
   balancePaise: number;
   createdAt: Date;
@@ -39,6 +40,8 @@ export interface Market {
   active: boolean;
   rateCard: RateCard;
   limits: StakeLimits;
+  jodiChartUrl?: string;
+  pannaChartUrl?: string;
 }
 
 export interface MarketDay {
@@ -81,6 +84,17 @@ export interface WalletEntry {
   createdAt: Date;
 }
 
+export interface PaymentOrder {
+  _id: ObjectId;
+  userId: ObjectId;
+  providerOrderId: string;
+  amountPaise: number;
+  status: "processing" | "paid" | "failed";
+  paymentUrl?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface BetBatch {
   _id: ObjectId;
   userId: ObjectId;
@@ -90,14 +104,75 @@ export interface BetBatch {
   createdAt: Date;
 }
 
+export const ADMIN_PERMISSIONS = [
+  "users",
+  "markets",
+  "results",
+  "transactions",
+  "reports",
+  "settings",
+  "content",
+  "staff",
+] as const;
+export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
+
+export interface AppSettings {
+  _id: ObjectId;
+  minDepositPaise: number;
+  minWithdrawalPaise: number;
+  maxWithdrawalPaise: number;
+  withdrawalStart: string;
+  withdrawalEnd: string;
+  firstDepositBonusPercent: number;
+  referralBonusPaise: number;
+}
+
+export interface Banner {
+  _id: ObjectId;
+  title: string;
+  imageData: string;
+  linkUrl?: string;
+  active: boolean;
+  sortOrder: number;
+  createdAt: Date;
+}
+
+export interface Notification {
+  _id: ObjectId;
+  title: string;
+  description: string;
+  topic?: string;
+  active: boolean;
+  createdAt: Date;
+}
+
+export interface UserFcmToken {
+  _id: ObjectId;
+  userId: ObjectId;
+  token: string;
+  platform: "android" | "ios";
+  updatedAt: Date;
+}
+
 type Table =
   | "users"
   | "markets"
   | "market_days"
   | "bets"
   | "wallet_entries"
-  | "bet_batches";
-type JsonField = "rateCard" | "limits" | "request" | "slips" | "betIds";
+  | "payment_orders"
+  | "bet_batches"
+  | "app_settings"
+  | "banners"
+  | "notifications"
+  | "user_fcm_tokens";
+type JsonField =
+  | "rateCard"
+  | "limits"
+  | "request"
+  | "slips"
+  | "betIds"
+  | "adminPermissions";
 type SqlValue = string | number | boolean | Date | null;
 const jsonFields = new Set<string>([
   "rateCard",
@@ -105,9 +180,10 @@ const jsonFields = new Set<string>([
   "request",
   "slips",
   "betIds",
+  "adminPermissions",
 ] satisfies JsonField[]);
 const idFields = new Set(["_id", "userId", "marketId", "referredBy"]);
-const dateFields = new Set(["createdAt", "openDeclaredAt", "closeDeclaredAt"]);
+const dateFields = new Set(["createdAt", "openDeclaredAt", "closeDeclaredAt", "updatedAt"]);
 const booleanFields = new Set(["disabled", "active", "cancelled"]);
 const columns: Record<Table, readonly string[]> = {
   users: [
@@ -121,6 +197,7 @@ const columns: Record<Table, readonly string[]> = {
     "passwordHash",
     "passwordVersion",
     "role",
+    "adminPermissions",
     "disabled",
     "balancePaise",
     "createdAt",
@@ -136,6 +213,8 @@ const columns: Record<Table, readonly string[]> = {
     "active",
     "rateCard",
     "limits",
+    "jodiChartUrl",
+    "pannaChartUrl",
   ],
   market_days: [
     "_id",
@@ -169,6 +248,16 @@ const columns: Record<Table, readonly string[]> = {
     "referenceId",
     "createdAt",
   ],
+  payment_orders: [
+    "_id",
+    "userId",
+    "providerOrderId",
+    "amountPaise",
+    "status",
+    "paymentUrl",
+    "createdAt",
+    "updatedAt",
+  ],
   bet_batches: [
     "_id",
     "userId",
@@ -177,6 +266,27 @@ const columns: Record<Table, readonly string[]> = {
     "betIds",
     "createdAt",
   ],
+  app_settings: [
+    "_id",
+    "minDepositPaise",
+    "minWithdrawalPaise",
+    "maxWithdrawalPaise",
+    "withdrawalStart",
+    "withdrawalEnd",
+    "firstDepositBonusPercent",
+    "referralBonusPaise",
+  ],
+  banners: [
+    "_id",
+    "title",
+    "imageData",
+    "linkUrl",
+    "active",
+    "sortOrder",
+    "createdAt",
+  ],
+  notifications: ["_id", "title", "description", "topic", "active", "createdAt"],
+  user_fcm_tokens: ["_id", "userId", "token", "platform", "updatedAt"],
 };
 const column = (field: string): string =>
   field === "_id"
@@ -477,6 +587,30 @@ class SqlCollection<T extends { _id: ObjectId }> {
       ? this.findOne({ _id: id }, options)
       : this.findOne(filter, options);
   }
+  async deleteOne(
+    filter: Filter,
+    options: Options = {}
+  ): Promise<{ deletedCount: number }> {
+    const clause = where(filter);
+    const executor = options.session?.connection ?? pool;
+    const [result] = await executor.execute<ResultSetHeader>(
+      `DELETE FROM \`${this.table}\` WHERE ${clause.sql} LIMIT 1`,
+      clause.values
+    );
+    return { deletedCount: result.affectedRows };
+  }
+  async deleteMany(
+    filter: Filter,
+    options: Options = {}
+  ): Promise<{ deletedCount: number }> {
+    const clause = where(filter);
+    const executor = options.session?.connection ?? pool;
+    const [result] = await executor.execute<ResultSetHeader>(
+      `DELETE FROM \`${this.table}\` WHERE ${clause.sql}`,
+      clause.values
+    );
+    return { deletedCount: result.affectedRows };
+  }
   async countDocuments(filter: Filter = {}): Promise<number> {
     const clause = where(filter);
     const [rows] = await pool.execute<RowDataPacket[]>(
@@ -494,19 +628,29 @@ export function collections() {
     days: new SqlCollection<MarketDay>("market_days"),
     bets: new SqlCollection<Bet>("bets"),
     entries: new SqlCollection<WalletEntry>("wallet_entries"),
+    paymentOrders: new SqlCollection<PaymentOrder>("payment_orders"),
     batches: new SqlCollection<BetBatch>("bet_batches"),
+    settings: new SqlCollection<AppSettings>("app_settings"),
+    banners: new SqlCollection<Banner>("banners"),
+    notifications: new SqlCollection<Notification>("notifications"),
+    fcmTokens: new SqlCollection<UserFcmToken>("user_fcm_tokens"),
   };
 }
 
 const schema = [
-  `CREATE TABLE IF NOT EXISTS users (id CHAR(24) PRIMARY KEY, email VARCHAR(255) UNIQUE, name VARCHAR(80), phone VARCHAR(10) UNIQUE, dob CHAR(10), referral_code VARCHAR(16) UNIQUE, referred_by CHAR(24), password_hash VARCHAR(255) NOT NULL, password_version INT NOT NULL DEFAULT 0, role ENUM('admin','player') NOT NULL, disabled BOOLEAN NOT NULL DEFAULT FALSE, balance_paise BIGINT NOT NULL DEFAULT 0, created_at DATETIME(3) NOT NULL, INDEX idx_users_role_created (role, created_at), FOREIGN KEY (referred_by) REFERENCES users(id)) ENGINE=InnoDB`,
-  `CREATE TABLE IF NOT EXISTS markets (id CHAR(24) PRIMARY KEY, slug VARCHAR(100) NOT NULL UNIQUE, name VARCHAR(120) NOT NULL, open_time CHAR(5) NOT NULL, close_time CHAR(5) NOT NULL, timezone VARCHAR(64) NOT NULL, cutoff_minutes INT NOT NULL, active BOOLEAN NOT NULL, rate_card JSON NOT NULL, limits JSON NOT NULL, INDEX idx_markets_active_time (active, open_time)) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS users (id CHAR(24) PRIMARY KEY, email VARCHAR(255) UNIQUE, name VARCHAR(80), phone VARCHAR(10) UNIQUE, dob CHAR(10), referral_code VARCHAR(16) UNIQUE, referred_by CHAR(24), password_hash VARCHAR(255) NOT NULL, password_version INT NOT NULL DEFAULT 0, role ENUM('admin','player') NOT NULL, admin_permissions JSON, disabled BOOLEAN NOT NULL DEFAULT FALSE, balance_paise BIGINT NOT NULL DEFAULT 0, created_at DATETIME(3) NOT NULL, INDEX idx_users_role_created (role, created_at), FOREIGN KEY (referred_by) REFERENCES users(id)) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS markets (id CHAR(24) PRIMARY KEY, slug VARCHAR(100) NOT NULL UNIQUE, name VARCHAR(120) NOT NULL, open_time CHAR(5) NOT NULL, close_time CHAR(5) NOT NULL, timezone VARCHAR(64) NOT NULL, cutoff_minutes INT NOT NULL, active BOOLEAN NOT NULL, rate_card JSON NOT NULL, limits JSON NOT NULL, jodi_chart_url VARCHAR(500), panna_chart_url VARCHAR(500), INDEX idx_markets_active_time (active, open_time)) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS market_days (id CHAR(24) PRIMARY KEY, market_id CHAR(24) NOT NULL, date CHAR(10) NOT NULL, open_panna CHAR(3), close_panna CHAR(3), cancelled BOOLEAN NOT NULL DEFAULT FALSE, revision INT NOT NULL DEFAULT 0, open_declared_at DATETIME(3), close_declared_at DATETIME(3), open_revision INT, close_revision INT, UNIQUE KEY uq_market_day (market_id, date), FOREIGN KEY (market_id) REFERENCES markets(id)) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS bets (id CHAR(24) PRIMARY KEY, user_id CHAR(24) NOT NULL, market_id CHAR(24) NOT NULL, date CHAR(10) NOT NULL, request JSON NOT NULL, slips JSON NOT NULL, total_stake_paise BIGINT NOT NULL, created_at DATETIME(3) NOT NULL, INDEX idx_bets_market_day (market_id, date, created_at), INDEX idx_bets_user_created (user_id, created_at), FOREIGN KEY (user_id) REFERENCES users(id), FOREIGN KEY (market_id) REFERENCES markets(id)) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS wallet_entries (id CHAR(24) PRIMARY KEY, user_id CHAR(24) NOT NULL, amount_paise BIGINT NOT NULL, balance_after_paise BIGINT NOT NULL, kind VARCHAR(20) NOT NULL, reference_id VARCHAR(128) NOT NULL, created_at DATETIME(3) NOT NULL, UNIQUE KEY uq_wallet_reference (kind, reference_id, user_id), INDEX idx_wallet_user_created (user_id, created_at), FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS payment_orders (id CHAR(24) PRIMARY KEY, user_id CHAR(24) NOT NULL, provider_order_id VARCHAR(64) NOT NULL, amount_paise BIGINT NOT NULL, status ENUM('processing','paid','failed') NOT NULL, payment_url VARCHAR(1000), created_at DATETIME(3) NOT NULL, updated_at DATETIME(3) NOT NULL, UNIQUE KEY uq_payment_provider_order (provider_order_id), INDEX idx_payment_user_created (user_id, created_at), INDEX idx_payment_status_updated (status, updated_at), FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS bet_batches (id CHAR(24) PRIMARY KEY, user_id CHAR(24) NOT NULL, request_id VARCHAR(128) NOT NULL, signature TEXT NOT NULL, bet_ids JSON NOT NULL, created_at DATETIME(3) NOT NULL, UNIQUE KEY uq_batch_request (user_id, request_id), FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS registration_challenges (id CHAR(24) PRIMARY KEY, phone VARCHAR(10) NOT NULL UNIQUE, name VARCHAR(80) NOT NULL, dob CHAR(10) NOT NULL, password_hash VARCHAR(255) NOT NULL, code_hash CHAR(64) NOT NULL, expires_at DATETIME(3) NOT NULL, last_sent_at DATETIME(3) NOT NULL, attempts TINYINT UNSIGNED NOT NULL DEFAULT 0, INDEX idx_registration_expiry (expires_at)) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS password_reset_challenges (id CHAR(24) PRIMARY KEY, user_id CHAR(24) NOT NULL UNIQUE, code_hash CHAR(64), token_hash CHAR(64), expires_at DATETIME(3) NOT NULL, last_sent_at DATETIME(3) NOT NULL, attempts TINYINT UNSIGNED NOT NULL DEFAULT 0, INDEX idx_reset_expiry (expires_at), FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS app_settings (id CHAR(24) PRIMARY KEY, min_deposit_paise BIGINT NOT NULL, min_withdrawal_paise BIGINT NOT NULL, max_withdrawal_paise BIGINT NOT NULL, withdrawal_start CHAR(5) NOT NULL, withdrawal_end CHAR(5) NOT NULL, first_deposit_bonus_percent TINYINT UNSIGNED NOT NULL DEFAULT 0, referral_bonus_paise BIGINT NOT NULL DEFAULT 0) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS banners (id CHAR(24) PRIMARY KEY, title VARCHAR(120) NOT NULL, image_data LONGTEXT NOT NULL, link_url VARCHAR(500), active BOOLEAN NOT NULL DEFAULT TRUE, sort_order INT NOT NULL DEFAULT 0, created_at DATETIME(3) NOT NULL, INDEX idx_banners_active_sort (active, sort_order)) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS notifications (id CHAR(24) PRIMARY KEY, title VARCHAR(160) NOT NULL, description TEXT NOT NULL, topic VARCHAR(80) NOT NULL DEFAULT 'all', active BOOLEAN NOT NULL DEFAULT TRUE, created_at DATETIME(3) NOT NULL, INDEX idx_notifications_active_created (active, created_at), INDEX idx_notifications_topic (topic)) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS user_fcm_tokens (id CHAR(24) PRIMARY KEY, user_id CHAR(24) NOT NULL, token VARCHAR(512) NOT NULL UNIQUE, platform VARCHAR(20) NOT NULL DEFAULT 'android', updated_at DATETIME(3) NOT NULL, INDEX idx_user_fcm_tokens_user (user_id), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE) ENGINE=InnoDB`,
 ];
 
 export async function connectDatabase(): Promise<
@@ -514,11 +658,50 @@ export async function connectDatabase(): Promise<
 > {
   try {
     for (const statement of schema) await pool.query(statement);
+    const [permissionsColumn] = await pool.execute<RowDataPacket[]>(
+      "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'admin_permissions' LIMIT 1"
+    );
+    if (permissionsColumn.length === 0)
+      await pool.query("ALTER TABLE users ADD COLUMN admin_permissions JSON");
+    const data = collections();
+    const defaultSettings = await data.settings.findOne({});
+    if (!defaultSettings)
+      await data.settings.insertOne({
+        _id: new ObjectId(),
+        minDepositPaise: 10_000,
+        minWithdrawalPaise: 50_000,
+        maxWithdrawalPaise: 5_000_000,
+        withdrawalStart: "09:00",
+        withdrawalEnd: "23:59",
+        firstDepositBonusPercent: 0,
+        referralBonusPaise: 0,
+      });
     const [dobColumn] = await pool.execute<RowDataPacket[]>(
       "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'dob' LIMIT 1"
     );
     if (dobColumn.length === 0)
       await pool.query("ALTER TABLE users ADD COLUMN dob CHAR(10)");
+    const [jodiColumn] = await pool.execute<RowDataPacket[]>(
+      "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'markets' AND COLUMN_NAME = 'jodi_chart_url' LIMIT 1"
+    );
+    if (jodiColumn.length === 0)
+      await pool.query(
+        "ALTER TABLE markets ADD COLUMN jodi_chart_url VARCHAR(500)"
+      );
+    const [pannaColumn] = await pool.execute<RowDataPacket[]>(
+      "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'markets' AND COLUMN_NAME = 'panna_chart_url' LIMIT 1"
+    );
+    if (pannaColumn.length === 0)
+      await pool.query(
+        "ALTER TABLE markets ADD COLUMN panna_chart_url VARCHAR(500)"
+      );
+    const [topicColumn] = await pool.execute<RowDataPacket[]>(
+      "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notifications' AND COLUMN_NAME = 'topic' LIMIT 1"
+    );
+    if (topicColumn.length === 0)
+      await pool.query(
+        "ALTER TABLE notifications ADD COLUMN topic VARCHAR(80) NOT NULL DEFAULT 'all'"
+      );
     return collections();
   } catch (error) {
     await pool.end();

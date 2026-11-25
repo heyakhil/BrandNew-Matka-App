@@ -74,6 +74,8 @@ export interface MarketItem {
   closeBidLastTime?: string;
   status: MarketStatus;
   category: MarketCategory;
+  jodiChartUrl?: string;
+  pannaChartUrl?: string;
   rateCard?: Record<'single' | 'jodi' | 'sp' | 'dp' | 'tp' | 'halfSangam' | 'fullSangam', { numerator: number; denominator: number }>;
   limits?: { minPaise: number; maxPaise: number };
   recentChart: Array<{

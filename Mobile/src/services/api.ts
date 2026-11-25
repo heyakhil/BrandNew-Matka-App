@@ -7,8 +7,7 @@ import type {
   UserProfile,
   WalletTransaction,
 } from '../types/matka';
-
-const API_URL = 'http://localhost:4000/api';
+import { resolveApiUrl } from './apiConfig';
 
 interface Session {
   token: string;
@@ -31,6 +30,8 @@ interface MarketResponse {
   closeBidLastTime: string;
   line: string;
   phase: 'preOpen' | 'afterOpenCutoff' | 'closed' | 'cancelled';
+  jodiChartUrl?: string;
+  pannaChartUrl?: string;
   recentChart: Array<{ date: string; result: string }>;
   rateCard: NonNullable<MarketItem['rateCard']>;
   limits: NonNullable<MarketItem['limits']>;
@@ -69,9 +70,12 @@ async function request<T>(
   body?: object,
   method = 'POST',
 ): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
   try {
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetch(`${resolveApiUrl()}${path}`, {
       method: body ? method : 'GET',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -88,7 +92,11 @@ async function request<T>(
       );
     return data as T;
   } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError')
+      throw new Error('The payment request timed out. Please try again.');
     throw requestError(error);
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -202,6 +210,8 @@ export async function loadAccount(
           ? 'close_running'
           : 'closed',
       category: 'main',
+      jodiChartUrl: market.jodiChartUrl,
+      pannaChartUrl: market.pannaChartUrl,
       recentChart: market.recentChart,
       rateCard: market.rateCard,
       limits: market.limits,
@@ -291,6 +301,51 @@ export async function saveProfile(
   }
 }
 
+export interface PaymentOrder {
+  orderId: string;
+  amountPaise: number;
+  status: 'processing' | 'paid' | 'failed';
+}
+
+export interface CreatedPaymentOrder extends PaymentOrder {
+  paymentUrl: string;
+}
+
+export async function createPay0Payment(
+  token: string,
+  amountRupees: number,
+): Promise<CreatedPaymentOrder> {
+  try {
+    const order = await request<{ providerOrderId: string; paymentUrl: string }>(
+      '/me/payments/pay0',
+      token,
+      { amountRupees },
+    );
+    return {
+      orderId: order.providerOrderId,
+      amountPaise: amountRupees * 100,
+      status: 'processing',
+      paymentUrl: order.paymentUrl,
+    };
+  } catch (error) {
+    throw requestError(error);
+  }
+}
+
+export async function getPay0PaymentStatus(
+  token: string,
+  orderId: string,
+): Promise<PaymentOrder> {
+  try {
+    return await request<PaymentOrder>(
+      `/me/payments/pay0/${encodeURIComponent(orderId)}`,
+      token,
+    );
+  } catch (error) {
+    throw requestError(error);
+  }
+}
+
 export async function submitBets(
   token: string,
   marketId: string,
@@ -314,7 +369,7 @@ export async function changePassword(
   newPassword: string,
 ): Promise<string> {
   try {
-    const response = await fetch(`${API_URL}/me/password`, {
+    const response = await fetch(`${resolveApiUrl()}/me/password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -328,6 +383,45 @@ export async function changePassword(
     }
     const body: { token: string } = await response.json();
     return body.token;
+  } catch (error) {
+    throw requestError(error);
+  }
+}
+
+export async function registerFcmTokenApi(
+  fcmToken: string,
+  authToken: string,
+  platform = 'android',
+): Promise<void> {
+  try {
+    await request<void>('/me/fcm-token', authToken, { token: fcmToken, platform });
+  } catch (error) {
+    throw requestError(error);
+  }
+}
+
+export async function removeFcmTokenApi(
+  fcmToken: string,
+  authToken: string,
+): Promise<void> {
+  try {
+    await request<void>('/me/fcm-token', authToken, { token: fcmToken }, 'DELETE');
+  } catch (error) {
+    throw requestError(error);
+  }
+}
+
+export interface AppNotification {
+  _id: string;
+  title: string;
+  description: string;
+  topic?: string;
+  createdAt: string;
+}
+
+export async function fetchNotifications(): Promise<AppNotification[]> {
+  try {
+    return await request<AppNotification[]>('/notifications', undefined, undefined, 'GET');
   } catch (error) {
     throw requestError(error);
   }

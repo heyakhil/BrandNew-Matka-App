@@ -15,6 +15,8 @@ export const INITIAL_MARKETS: MarketItem[] = [
     closeTime: '07:40 PM',
     status: 'close_running',
     category: 'main',
+    jodiChartUrl: 'https://royalclubmatka.com/charts/sitarani-night-jodi',
+    pannaChartUrl: 'https://royalclubmatka.com/charts/sitarani-night-panna',
     recentChart: [
       { date: '16 Nov', result: '470-1*-***' },
       { date: '15 Nov', result: '258-59-135' },
@@ -29,6 +31,8 @@ export const INITIAL_MARKETS: MarketItem[] = [
     closeTime: '08:05 PM',
     status: 'close_running',
     category: 'main',
+    jodiChartUrl: 'https://royalclubmatka.com/charts/sitarani-night-jodi',
+    pannaChartUrl: 'https://royalclubmatka.com/charts/sitarani-night-panna',
     recentChart: [
       { date: '16 Nov', result: '133-7*-***' },
       { date: '15 Nov', result: '577-99-667' },
