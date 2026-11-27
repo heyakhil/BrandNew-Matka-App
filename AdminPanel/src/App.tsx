@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   api,
+  formatTime12h,
   rupees,
+  timeMinutes,
   type AdminPermission,
   type Dashboard,
   type Market,
   type ResultDay,
   type User,
 } from "./api";
-import { Button, Input, Select } from "./components/atoms";
+import { AmPmTimeInput, Button, Input, Select } from "./components/atoms";
 import { Panel } from "./components/Panel";
 import {
   BannersView,
@@ -19,6 +21,7 @@ import {
   StaffView,
   TransactionsView,
   UserReportDialog,
+  WithdrawalRequestsView,
 } from "./components/organisms/AdminFeatures";
 
 type Tab =
@@ -31,6 +34,7 @@ type Tab =
   | "winners"
   | "transactions"
   | "deposits"
+  | "withdrawalRequests"
   | "withdrawals"
   | "banners"
   | "notifications"
@@ -62,6 +66,7 @@ const navGroups: NavGroup[] = [
     items: [
       { id: "transactions", label: "Transactions", permission: "transactions" },
       { id: "deposits", label: "Deposit History", permission: "transactions" },
+      { id: "withdrawalRequests", label: "Withdrawal Requests", permission: "transactions" },
       { id: "withdrawals", label: "Withdrawal History", permission: "transactions" },
     ],
   },
@@ -332,6 +337,9 @@ export function App() {
             onChanged={changed}
             onError={failed}
           />
+        )}
+        {tab === "withdrawalRequests" && (
+          <WithdrawalRequestsView onChanged={changed} onError={failed} />
         )}
         {(tab === "transactions" || tab === "deposits" || tab === "withdrawals") && (
           <TransactionsView
@@ -933,6 +941,9 @@ function MarketsView({
       onError(cause);
     }
   }
+  const sortedMarkets = [...markets].sort(
+    (a, b) => timeMinutes(a.openTime) - timeMinutes(b.openTime)
+  );
   return (
     <>
       <Panel title="Add market">
@@ -957,19 +968,15 @@ function MarketsView({
             value={slug}
             onChange={(event) => setSlug(event.target.value)}
           />
-          <Input
+          <AmPmTimeInput
             label="Open time"
-            type="time"
-            required
             value={openTime}
-            onChange={(event) => setOpenTime(event.target.value)}
+            onChange={setOpenTime}
           />
-          <Input
+          <AmPmTimeInput
             label="Close time"
-            type="time"
-            required
             value={closeTime}
-            onChange={(event) => setCloseTime(event.target.value)}
+            onChange={setCloseTime}
           />
           <Button type="submit" className="primary">
             Create market
@@ -985,7 +992,7 @@ function MarketsView({
           />
         </div>
       )}
-      <RateEditor markets={markets} onChanged={onChanged} onError={onError} />
+      <RateEditor markets={sortedMarkets} onChanged={onChanged} onError={onError} />
       <Panel title="Configured markets">
         <div className="tableWrap">
           <table>
@@ -999,7 +1006,7 @@ function MarketsView({
               </tr>
             </thead>
             <tbody>
-              {markets.map((market) => (
+              {sortedMarkets.map((market) => (
                 <MarketRow
                   key={market._id}
                   market={market}
@@ -1026,9 +1033,9 @@ function MarketRow({
 }) {
   return (
     <tr>
-      <td>{market.name}</td>
-      <td>{market.openTime}</td>
-      <td>{market.closeTime}</td>
+      <td><strong>{market.name}</strong></td>
+      <td>{formatTime12h(market.openTime)}</td>
+      <td>{formatTime12h(market.closeTime)}</td>
       <td>{market.active ? "On" : "Off"}</td>
       <td className="actions">
         <Button onClick={() => onEdit(market)}>Edit</Button>
@@ -1057,6 +1064,12 @@ function MarketEditor({
   const [openTime, setOpenTime] = useState(market.openTime);
   const [closeTime, setCloseTime] = useState(market.closeTime);
   const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    setName(market.name);
+    setSlug(market.slug);
+    setOpenTime(market.openTime);
+    setCloseTime(market.closeTime);
+  }, [market]);
   const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     setSaving(true);
@@ -1071,8 +1084,8 @@ function MarketEditor({
       <form className="formGrid" onSubmit={(event) => void submit(event)}>
         <Input label="Market name" required value={name} onChange={(event) => setName(event.target.value)} />
         <Input label="Slug" required value={slug} onChange={(event) => setSlug(event.target.value)} />
-        <Input label="Open time" type="time" required value={openTime} onChange={(event) => setOpenTime(event.target.value)} />
-        <Input label="Close time" type="time" required value={closeTime} onChange={(event) => setCloseTime(event.target.value)} />
+        <AmPmTimeInput label="Open time" value={openTime} onChange={setOpenTime} />
+        <AmPmTimeInput label="Close time" value={closeTime} onChange={setCloseTime} />
         <div className="actions">
           <Button type="submit" className="primary" disabled={saving}>{saving ? "Saving…" : "Save market"}</Button>
           <Button onClick={onCancel}>Cancel</Button>

@@ -8,7 +8,7 @@ import { styles } from './styles';
 interface PaymentDetailsFormProps {
   kind: 'bank' | 'upi';
   bankDetails: BankDetails;
-  onSave: (details: BankDetails) => void;
+  onSave: (details: BankDetails) => Promise<void> | void;
 }
 
 export const PaymentDetailsForm: React.FC<PaymentDetailsFormProps> = ({
@@ -18,29 +18,47 @@ export const PaymentDetailsForm: React.FC<PaymentDetailsFormProps> = ({
 }) => {
   const [accountNumber, setAccountNumber] = useState(bankDetails.accountNumber);
   const [accountHolder, setAccountHolder] = useState(bankDetails.accountHolder);
+  const [bankName, setBankName] = useState(bankDetails.bankName);
   const [ifscCode, setIfscCode] = useState(bankDetails.ifscCode);
   const [upiId, setUpiId] = useState(bankDetails.upiId);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = (): void => {
+  const handleSave = async (): Promise<void> => {
+    if (saving) return;
     if (kind === 'bank') {
       if (!accountHolder.trim() || !accountNumber.trim() || !ifscCode.trim()) {
         setError('Enter account name, account number and IFSC code.');
         return;
       }
-      onSave({
-        ...bankDetails,
-        accountHolder: accountHolder.trim(),
-        accountNumber: accountNumber.trim(),
-        ifscCode: ifscCode.trim().toUpperCase(),
-      });
+      setSaving(true);
+      try {
+        await onSave({
+          ...bankDetails,
+          accountHolder: accountHolder.trim(),
+          bankName: bankName.trim(),
+          accountNumber: accountNumber.trim(),
+          ifscCode: ifscCode.trim().toUpperCase(),
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unable to save bank details.');
+      } finally {
+        setSaving(false);
+      }
       return;
     }
     if (!/^[\w.-]{2,}@[A-Za-z]{2,}$/.test(upiId.trim())) {
       setError('Enter a valid UPI ID (e.g. name@bank).');
       return;
     }
-    onSave({ ...bankDetails, upiId: upiId.trim() });
+    setSaving(true);
+    try {
+      await onSave({ ...bankDetails, upiId: upiId.trim() });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save UPI details.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -69,6 +87,16 @@ export const PaymentDetailsForm: React.FC<PaymentDetailsFormProps> = ({
                 }}
                 icon="account-outline"
                 placeholder="Enter account name"
+                keyboardType="default"
+              />
+              <PillInput
+                value={bankName}
+                onChangeText={value => {
+                  setBankName(value);
+                  setError(null);
+                }}
+                icon="domain"
+                placeholder="Enter bank name"
                 keyboardType="default"
               />
               <PillInput
@@ -101,7 +129,10 @@ export const PaymentDetailsForm: React.FC<PaymentDetailsFormProps> = ({
       <View style={styles.footer}>
         <GradientButton
           label={kind === 'bank' ? 'UPDATE BANK' : 'UPDATE UPI'}
-          onPress={handleSave}
+          onPress={() => {
+            handleSave().catch(() => {});
+          }}
+          disabled={saving}
           height={50}
         />
       </View>

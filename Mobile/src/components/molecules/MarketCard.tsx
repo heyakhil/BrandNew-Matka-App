@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Icon, Text } from 'react-native-paper';
 import { APP_COLORS } from '../../theme/paperTheme';
 import type { MarketItem } from '../../types/matka';
+import { formatDisplayTime } from '../../utils/matkaHelpers';
 import { GradientCircle } from '../atoms/GradientCircle';
 import { StatusBadge } from '../atoms/StatusBadge';
 
@@ -46,8 +47,14 @@ export const MarketCard: React.FC<MarketCardProps> = ({
         </Text>
         <Text style={styles.result}>{market.resultLine}</Text>
         <View style={styles.timings}>
-          <BidTime label="Open Bids" value={market.openBidLastTime ?? market.openTime} />
-          <BidTime label="Close Bids" value={market.closeBidLastTime ?? market.closeTime} />
+          <BidTime
+            label="Open Bids"
+            value={formatDisplayTime(market.openBidLastTime ?? market.openTime)}
+          />
+          <BidTime
+            label="Close Bids"
+            value={formatDisplayTime(market.closeBidLastTime ?? market.closeTime)}
+          />
         </View>
       </View>
 
@@ -87,10 +94,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   name: {
-    color: APP_COLORS.textPrimary,
-    fontSize: 16,
-    lineHeight: 19,
-    fontWeight: '600',
+    color: '#111827',
+    fontSize: 16.5,
+    lineHeight: 20,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   result: {
     color: APP_COLORS.gradientStart,

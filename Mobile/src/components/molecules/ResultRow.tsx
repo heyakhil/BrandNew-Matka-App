@@ -34,10 +34,11 @@ const styles = StyleSheet.create({
   },
   name: {
     flex: 1,
-    color: '#F5BE8A',
-    fontSize: 15,
-    lineHeight: 18,
-    fontWeight: '700',
+    color: '#111827',
+    fontSize: 15.5,
+    lineHeight: 20,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   result: {
     color: APP_COLORS.textPrimary,

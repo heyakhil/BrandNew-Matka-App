@@ -110,8 +110,9 @@ const styles = StyleSheet.create({
   },
   message: {
     marginTop: 10,
-    fontSize: 14,
-    color: APP_COLORS.textSecondary,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
     textAlign: 'center',
     lineHeight: 20,
   },

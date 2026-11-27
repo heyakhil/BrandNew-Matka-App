@@ -4,6 +4,7 @@ import { Text } from 'react-native-paper';
 import { ResultRow } from '../../components/molecules/ResultRow';
 import { APP_COLORS } from '../../theme/paperTheme';
 import type { MarketItem } from '../../types/matka';
+import { sortMarketsByOpenTime } from '../../utils/matkaHelpers';
 
 interface GameResultScreenProps {
   markets: MarketItem[];
@@ -25,7 +26,7 @@ export const GameResultScreen: React.FC<GameResultScreenProps> = ({
     </View>
 
     <FlatList
-      data={markets.filter(m => m.category === 'main')}
+      data={sortMarketsByOpenTime(markets.filter(m => m.category === 'main'))}
       keyExtractor={item => item.id}
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}

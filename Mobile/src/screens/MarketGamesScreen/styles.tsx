@@ -7,7 +7,8 @@ export const styles = StyleSheet.create({
     backgroundColor: APP_COLORS.primaryBackground,
   },
   headerTitle: {
-    color: APP_COLORS.textPrimary,
+    color: '#111827',
+    fontSize: 18,
     fontWeight: '800',
     textAlign: 'center',
     letterSpacing: 0.6,

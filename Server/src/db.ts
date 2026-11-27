@@ -8,9 +8,17 @@ import type {
   PricedSlip,
   RateCard,
   StakeLimits,
-} from "../../packages/matka-rules/src/index.ts";
+} from "./matka-rules/index.ts";
 import { ObjectId } from "./id.ts";
 export { ObjectId } from "./id.ts";
+
+export interface BankDetails {
+  accountHolder?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  upiId?: string;
+}
 
 export interface User {
   _id: ObjectId;
@@ -26,6 +34,7 @@ export interface User {
   adminPermissions?: AdminPermission[] | null;
   disabled: boolean;
   balancePaise: number;
+  bankDetails?: BankDetails;
   createdAt: Date;
 }
 
@@ -154,6 +163,19 @@ export interface UserFcmToken {
   updatedAt: Date;
 }
 
+export interface WithdrawalRequest {
+  _id: ObjectId;
+  userId: ObjectId;
+  amountPaise: number;
+  method: "bank" | "upi";
+  paymentDetails: BankDetails;
+  status: "pending" | "approved" | "rejected";
+  adminNote?: string;
+  reviewedBy?: ObjectId;
+  reviewedAt?: Date;
+  createdAt: Date;
+}
+
 type Table =
   | "users"
   | "markets"
@@ -161,6 +183,7 @@ type Table =
   | "bets"
   | "wallet_entries"
   | "payment_orders"
+  | "withdrawal_requests"
   | "bet_batches"
   | "app_settings"
   | "banners"
@@ -172,7 +195,9 @@ type JsonField =
   | "request"
   | "slips"
   | "betIds"
-  | "adminPermissions";
+  | "adminPermissions"
+  | "bankDetails"
+  | "paymentDetails";
 type SqlValue = string | number | boolean | Date | null;
 const jsonFields = new Set<string>([
   "rateCard",
@@ -181,9 +206,11 @@ const jsonFields = new Set<string>([
   "slips",
   "betIds",
   "adminPermissions",
+  "bankDetails",
+  "paymentDetails",
 ] satisfies JsonField[]);
-const idFields = new Set(["_id", "userId", "marketId", "referredBy"]);
-const dateFields = new Set(["createdAt", "openDeclaredAt", "closeDeclaredAt", "updatedAt"]);
+const idFields = new Set(["_id", "userId", "marketId", "referredBy", "reviewedBy"]);
+const dateFields = new Set(["createdAt", "openDeclaredAt", "closeDeclaredAt", "updatedAt", "reviewedAt"]);
 const booleanFields = new Set(["disabled", "active", "cancelled"]);
 const columns: Record<Table, readonly string[]> = {
   users: [
@@ -200,6 +227,7 @@ const columns: Record<Table, readonly string[]> = {
     "adminPermissions",
     "disabled",
     "balancePaise",
+    "bankDetails",
     "createdAt",
   ],
   markets: [
@@ -257,6 +285,18 @@ const columns: Record<Table, readonly string[]> = {
     "paymentUrl",
     "createdAt",
     "updatedAt",
+  ],
+  withdrawal_requests: [
+    "_id",
+    "userId",
+    "amountPaise",
+    "method",
+    "paymentDetails",
+    "status",
+    "adminNote",
+    "reviewedBy",
+    "reviewedAt",
+    "createdAt",
   ],
   bet_batches: [
     "_id",
@@ -629,6 +669,7 @@ export function collections() {
     bets: new SqlCollection<Bet>("bets"),
     entries: new SqlCollection<WalletEntry>("wallet_entries"),
     paymentOrders: new SqlCollection<PaymentOrder>("payment_orders"),
+    withdrawalRequests: new SqlCollection<WithdrawalRequest>("withdrawal_requests"),
     batches: new SqlCollection<BetBatch>("bet_batches"),
     settings: new SqlCollection<AppSettings>("app_settings"),
     banners: new SqlCollection<Banner>("banners"),
@@ -644,6 +685,7 @@ const schema = [
   `CREATE TABLE IF NOT EXISTS bets (id CHAR(24) PRIMARY KEY, user_id CHAR(24) NOT NULL, market_id CHAR(24) NOT NULL, date CHAR(10) NOT NULL, request JSON NOT NULL, slips JSON NOT NULL, total_stake_paise BIGINT NOT NULL, created_at DATETIME(3) NOT NULL, INDEX idx_bets_market_day (market_id, date, created_at), INDEX idx_bets_user_created (user_id, created_at), FOREIGN KEY (user_id) REFERENCES users(id), FOREIGN KEY (market_id) REFERENCES markets(id)) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS wallet_entries (id CHAR(24) PRIMARY KEY, user_id CHAR(24) NOT NULL, amount_paise BIGINT NOT NULL, balance_after_paise BIGINT NOT NULL, kind VARCHAR(20) NOT NULL, reference_id VARCHAR(128) NOT NULL, created_at DATETIME(3) NOT NULL, UNIQUE KEY uq_wallet_reference (kind, reference_id, user_id), INDEX idx_wallet_user_created (user_id, created_at), FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS payment_orders (id CHAR(24) PRIMARY KEY, user_id CHAR(24) NOT NULL, provider_order_id VARCHAR(64) NOT NULL, amount_paise BIGINT NOT NULL, status ENUM('processing','paid','failed') NOT NULL, payment_url VARCHAR(1000), created_at DATETIME(3) NOT NULL, updated_at DATETIME(3) NOT NULL, UNIQUE KEY uq_payment_provider_order (provider_order_id), INDEX idx_payment_user_created (user_id, created_at), INDEX idx_payment_status_updated (status, updated_at), FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS withdrawal_requests (id CHAR(24) PRIMARY KEY, user_id CHAR(24) NOT NULL, amount_paise BIGINT NOT NULL, method ENUM('bank','upi') NOT NULL, payment_details JSON NOT NULL, status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending', admin_note VARCHAR(255), reviewed_by CHAR(24), reviewed_at DATETIME(3), created_at DATETIME(3) NOT NULL, INDEX idx_withdrawal_status_created (status, created_at), INDEX idx_withdrawal_user_created (user_id, created_at), FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS bet_batches (id CHAR(24) PRIMARY KEY, user_id CHAR(24) NOT NULL, request_id VARCHAR(128) NOT NULL, signature TEXT NOT NULL, bet_ids JSON NOT NULL, created_at DATETIME(3) NOT NULL, UNIQUE KEY uq_batch_request (user_id, request_id), FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS registration_challenges (id CHAR(24) PRIMARY KEY, phone VARCHAR(10) NOT NULL UNIQUE, name VARCHAR(80) NOT NULL, dob CHAR(10) NOT NULL, password_hash VARCHAR(255) NOT NULL, code_hash CHAR(64) NOT NULL, expires_at DATETIME(3) NOT NULL, last_sent_at DATETIME(3) NOT NULL, attempts TINYINT UNSIGNED NOT NULL DEFAULT 0, INDEX idx_registration_expiry (expires_at)) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS password_reset_challenges (id CHAR(24) PRIMARY KEY, user_id CHAR(24) NOT NULL UNIQUE, code_hash CHAR(64), token_hash CHAR(64), expires_at DATETIME(3) NOT NULL, last_sent_at DATETIME(3) NOT NULL, attempts TINYINT UNSIGNED NOT NULL DEFAULT 0, INDEX idx_reset_expiry (expires_at), FOREIGN KEY (user_id) REFERENCES users(id)) ENGINE=InnoDB`,
@@ -702,6 +744,11 @@ export async function connectDatabase(): Promise<
       await pool.query(
         "ALTER TABLE notifications ADD COLUMN topic VARCHAR(80) NOT NULL DEFAULT 'all'"
       );
+    const [bankDetailsColumn] = await pool.execute<RowDataPacket[]>(
+      "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'bank_details' LIMIT 1"
+    );
+    if (bankDetailsColumn.length === 0)
+      await pool.query("ALTER TABLE users ADD COLUMN bank_details JSON");
     return collections();
   } catch (error) {
     await pool.end();

@@ -11,7 +11,7 @@ import { PassbookScreen } from '../PassbookScreen';
 import { AddFundForm } from './AddFundForm';
 import { PaymentDetailsForm } from './PaymentDetailsForm';
 import { styles } from './styles';
-import { WithdrawForm } from './WithdrawForm';
+import { WithdrawForm, type WithdrawMethod } from './WithdrawForm';
 
 interface FundsScreenProps {
   profile: UserProfile;
@@ -21,8 +21,8 @@ interface FundsScreenProps {
   subView: FundsSubView;
   onSubViewChange: (view: FundsSubView) => void;
   onAddFund: (amount: number) => Promise<void>;
-  onWithdrawFund: (amount: number) => void;
-  onSaveBankDetails: (details: BankDetails) => void;
+  onWithdrawFund: (amount: number, method: WithdrawMethod) => Promise<void> | void;
+  onSaveBankDetails: (details: BankDetails) => Promise<void> | void;
   onSupportPress: () => void;
   live?: boolean;
 }
@@ -115,8 +115,8 @@ export const FundsScreen: React.FC<FundsScreenProps> = ({
           bankDetails={bankDetails}
           onSupportPress={onSupportPress}
           onDecline={() => onSubViewChange('menu')}
-          onSubmit={amount => {
-            onWithdrawFund(amount);
+          onSubmit={async (amount, method) => {
+            await onWithdrawFund(amount, method);
             onSubViewChange('menu');
           }}
         />
@@ -128,8 +128,8 @@ export const FundsScreen: React.FC<FundsScreenProps> = ({
           key={subView}
           kind={subView}
           bankDetails={bankDetails}
-          onSave={details => {
-            onSaveBankDetails(details);
+          onSave={async details => {
+            await onSaveBankDetails(details);
             onSubViewChange('menu');
           }}
         />

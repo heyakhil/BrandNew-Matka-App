@@ -3,6 +3,7 @@ import { FlatList, StyleSheet, View } from 'react-native';
 import { Card, Text } from 'react-native-paper';
 import { APP_COLORS } from '../../theme/paperTheme';
 import type { MarketItem } from '../../types/matka';
+import { formatDisplayTime, sortMarketsByOpenTime } from '../../utils/matkaHelpers';
 
 interface GameTimingScreenProps {
   markets: MarketItem[];
@@ -12,7 +13,7 @@ export const GameTimingScreen: React.FC<GameTimingScreenProps> = ({
   markets,
 }) => {
   const mainMarkets = useMemo(
-    () => markets.filter(m => m.category === 'main'),
+    () => sortMarketsByOpenTime(markets.filter(m => m.category === 'main')),
     [markets],
   );
 
@@ -46,7 +47,7 @@ export const GameTimingScreen: React.FC<GameTimingScreenProps> = ({
                   :
                 </Text>
                 <Text variant="bodyMedium" style={styles.timeValue}>
-                  {item.openTime}
+                  {formatDisplayTime(item.openTime)}
                 </Text>
               </View>
 
@@ -58,7 +59,7 @@ export const GameTimingScreen: React.FC<GameTimingScreenProps> = ({
                   :
                 </Text>
                 <Text variant="bodyMedium" style={styles.timeValue}>
-                  {item.closeTime}
+                  {formatDisplayTime(item.closeTime)}
                 </Text>
               </View>
             </Card.Content>
@@ -104,7 +105,8 @@ const styles = StyleSheet.create({
   },
   bazarValue: {
     flex: 1,
-    color: APP_COLORS.accent,
+    color: '#111827',
+    fontSize: 15.5,
     fontWeight: '800',
   },
   timeValue: {

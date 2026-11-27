@@ -12,8 +12,9 @@ import {
   type Transaction,
   type UserReport,
   type Winner,
+  type WithdrawalRequestItem,
 } from "../../api";
-import { Button, Input, Select, Textarea } from "../atoms";
+import { AmPmTimeInput, Button, Input, Select, Textarea } from "../atoms";
 import { Panel } from "../Panel";
 
 interface ActionProps {
@@ -155,8 +156,8 @@ export function SettingsView({ onChanged, onError }: ActionProps) {
         <Input label="Minimum deposit (₹)" type="number" min="1" value={settings.minDepositPaise / 100} onChange={(event) => setPaise("minDepositPaise", event.target.value)} />
         <Input label="Minimum withdrawal (₹)" type="number" min="1" value={settings.minWithdrawalPaise / 100} onChange={(event) => setPaise("minWithdrawalPaise", event.target.value)} />
         <Input label="Maximum withdrawal (₹)" type="number" min="1" value={settings.maxWithdrawalPaise / 100} onChange={(event) => setPaise("maxWithdrawalPaise", event.target.value)} />
-        <Input label="Withdrawal opens at" type="time" value={settings.withdrawalStart} onChange={(event) => setSettings({ ...settings, withdrawalStart: event.target.value })} />
-        <Input label="Withdrawal closes at" type="time" value={settings.withdrawalEnd} onChange={(event) => setSettings({ ...settings, withdrawalEnd: event.target.value })} />
+        <AmPmTimeInput label="Withdrawal opens at" value={settings.withdrawalStart} onChange={(next) => setSettings({ ...settings, withdrawalStart: next })} />
+        <AmPmTimeInput label="Withdrawal closes at" value={settings.withdrawalEnd} onChange={(next) => setSettings({ ...settings, withdrawalEnd: next })} />
         <Input label="First deposit bonus (%)" type="number" min="0" max="100" value={settings.firstDepositBonusPercent} onChange={(event) => setSettings({ ...settings, firstDepositBonusPercent: Number(event.target.value) })} />
         <Button type="submit" className="primary">Save settings</Button>
       </form>
@@ -424,5 +425,163 @@ export function UserReportDialog({ userId, onClose }: { userId: string; onClose:
         </div> : !error && <p>Loading…</p>}
       </section>
     </div>
+  );
+}
+
+export function WithdrawalRequestsView({ onChanged, onError }: ActionProps) {
+  const [requests, setRequests] = useState<WithdrawalRequestItem[]>([]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = async (): Promise<void> => {
+    try {
+      setRequests(await api<WithdrawalRequestItem[]>("/admin/withdrawals"));
+    } catch (cause) {
+      onError(cause);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const handleAction = async (
+    item: WithdrawalRequestItem,
+    action: "accept" | "reject"
+  ): Promise<void> => {
+    const promptLabel =
+      action === "accept"
+        ? `Approve withdrawal of ${rupees(item.amountPaise)} for ${item.userName}? This will deduct the amount from their wallet.`
+        : `Reject withdrawal of ${rupees(item.amountPaise)} for ${item.userName}?`;
+    if (!window.confirm(promptLabel)) return;
+    const note =
+      action === "reject"
+        ? window.prompt("Optional rejection reason (shown in notification):", "") ?? ""
+        : "";
+    setBusyId(item._id);
+    try {
+      await api(`/admin/withdrawals/${item._id}/${action}`, {
+        method: "POST",
+        body: JSON.stringify(note.trim() ? { note: note.trim() } : {}),
+      });
+      onChanged(
+        action === "accept"
+          ? `Withdrawal of ${rupees(item.amountPaise)} approved and debited.`
+          : `Withdrawal of ${rupees(item.amountPaise)} rejected.`
+      );
+      await load();
+    } catch (cause) {
+      onError(cause);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const pendingCount = useMemo(
+    () => requests.filter((row) => row.status === "pending").length,
+    [requests]
+  );
+
+  return (
+    <Panel title="Withdrawal requests">
+      <div className="summaryStrip">
+        <span>Pending requests</span>
+        <strong>{pendingCount}</strong>
+      </div>
+      <div className="tableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Amount</th>
+              <th>Method</th>
+              <th>Account Holder</th>
+              <th>Bank / IFSC</th>
+              <th>Account No. / UPI ID</th>
+              <th>Status</th>
+              <th>Requested At</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {requests.map((row) => (
+              <tr key={row._id}>
+                <td>
+                  <strong>{row.userName}</strong>
+                  <small className="cellMeta">
+                    {row.userPhone || row.userEmail || "—"} • Bal: {rupees(row.userBalancePaise)}
+                  </small>
+                </td>
+                <td className="negative">{rupees(row.amountPaise)}</td>
+                <td>
+                  <span className="badge">{row.method.toUpperCase()}</span>
+                </td>
+                <td>{row.method === "bank" ? row.paymentDetails.accountHolder || "—" : "—"}</td>
+                <td>
+                  {row.method === "bank" ? (
+                    <>
+                      {row.paymentDetails.bankName || "Bank"}
+                      <small className="cellMeta">
+                        IFSC: {row.paymentDetails.ifscCode || "—"}
+                      </small>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td>
+                  {row.method === "bank"
+                    ? row.paymentDetails.accountNumber || "—"
+                    : row.paymentDetails.upiId || "—"}
+                </td>
+                <td>
+                  <span
+                    className={
+                      row.status === "pending"
+                        ? "badge pending"
+                        : row.status === "rejected"
+                        ? "badge off"
+                        : "badge"
+                    }
+                  >
+                    {row.status}
+                  </span>
+                  {row.adminNote ? (
+                    <small className="cellMeta">{row.adminNote}</small>
+                  ) : null}
+                </td>
+                <td>{new Date(row.createdAt).toLocaleString("en-IN")}</td>
+                <td className="actions">
+                  {row.status === "pending" ? (
+                    <>
+                      <Button
+                        className="btnAccept"
+                        disabled={busyId === row._id}
+                        onClick={() => void handleAction(row, "accept")}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        className="btnReject"
+                        disabled={busyId === row._id}
+                        onClick={() => void handleAction(row, "reject")}
+                      >
+                        Reject
+                      </Button>
+                    </>
+                  ) : (
+                    <small className="cellMeta">
+                      {row.reviewedAt
+                        ? new Date(row.reviewedAt).toLocaleString("en-IN")
+                        : "Processed"}
+                    </small>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {requests.length === 0 && <p>No withdrawal requests found.</p>}
+    </Panel>
   );
 }

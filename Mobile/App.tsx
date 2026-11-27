@@ -58,13 +58,15 @@ import type {
   UserProfile,
   WalletTransaction,
 } from './src/types/matka';
-import { formatRupees } from './src/utils/matkaHelpers';
+import { formatRupees, sortMarketsByOpenTime } from './src/utils/matkaHelpers';
 import {
   createPay0Payment,
   getPay0PaymentStatus,
   loadAccount,
+  saveBankDetailsApi,
   saveProfile,
   submitBets,
+  submitWithdrawalRequest,
 } from './src/services/api';
 import { changePassword } from './src/services/api';
 import { toBetRequest } from './src/services/bets';
@@ -125,7 +127,9 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
   });
   const [balanceRupees, setBalanceRupees] = useState(live ? 0 : 1000);
   const [referralCode, setReferralCode] = useState('');
-  const [markets, setMarkets] = useState<MarketItem[]>(live ? [] : INITIAL_MARKETS);
+  const [markets, setMarkets] = useState<MarketItem[]>(
+    live ? [] : sortMarketsByOpenTime(INITIAL_MARKETS),
+  );
   const [bids, setBids] = useState<BidRecord[]>([]);
   const [transactions, setTransactions] =
     useState<WalletTransaction[]>(live ? [] : INITIAL_TRANSACTIONS);
@@ -150,12 +154,13 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
     if (!session) return;
     try {
       const account = await loadAccount(session.token);
-      setMarkets(account.markets);
+      setMarkets(sortMarketsByOpenTime(account.markets));
       setBids(account.bids);
       setTransactions(account.transactions);
       setBalanceRupees(account.balanceRupees);
       setReferralCode(account.referralCode);
       setProfile(account.profile);
+      setBankDetails(account.bankDetails);
     } catch (error) {
       notifyError(error instanceof Error ? error.message : 'Unable to refresh account.');
       if (
@@ -469,14 +474,23 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
     notifySuccess(`Added ${formatRupees(amount)} to wallet.`);
   };
 
-  const handleWithdrawFund = (amount: number): void => {
-    if (live) { notifyWarning('Contact support for withdrawals.'); return; }
+  const handleWithdrawFund = async (
+    amount: number,
+    method: 'bank' | 'upi',
+  ): Promise<void> => {
+    if (live) {
+      if (!session) throw new Error('Please log in before requesting a withdrawal.');
+      await submitWithdrawalRequest(session.token, amount, method);
+      await refreshAccount();
+      notifySuccess(`Withdrawal request of ${formatRupees(amount)} sent to admin.`);
+      return;
+    }
     setBalanceRupees(prev => prev - amount);
     setTransactions(prev => [
       {
         id: `tx-${Date.now()}`,
         type: 'withdraw',
-        title: 'Withdrawal Request',
+        title: `Withdrawal Request (${method.toUpperCase()})`,
         amountRupees: amount,
         beforeBalance: balanceRupees,
         afterBalance: balanceRupees - amount,
@@ -488,7 +502,13 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
     notifySuccess(`Withdrawal of ${formatRupees(amount)} requested.`);
   };
 
-  const handleSaveBankDetails = (details: BankDetails): void => {
+  const handleSaveBankDetails = async (details: BankDetails): Promise<void> => {
+    if (live && session) {
+      const saved = await saveBankDetailsApi(session.token, details);
+      setBankDetails(saved);
+      notifySuccess('Payment details saved.');
+      return;
+    }
     setBankDetails(details);
     notifySuccess('Payment details saved.');
   };
@@ -605,7 +625,7 @@ export function AppShell({ session = null, onLogout, onTokenChange }: { session?
             onOpenChart={market => setChartMarket(market)}
             onOpenRates={() => setSidebarScreen('gameRates')}
             onAddFunds={() => openFunds('addFund')}
-            onWithdraw={() => live ? void handleOpenWhatsApp() : openFunds('withdraw')}
+            onWithdraw={() => openFunds('withdraw')}
             onInvite={() => {
               handleShareApp();
             }}

@@ -461,6 +461,27 @@ th {
   background: #fff0ed;
   color: #af3026;
 }
+.badge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+.timePickerRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.btnAccept {
+  background: #168b5b;
+  border-color: #168b5b;
+  color: #fff;
+  font-weight: 700;
+}
+.btnReject {
+  background: #fff0ed;
+  border-color: #f3b5ac;
+  color: #af3026;
+  font-weight: 700;
+}
 .resultLine {
   font-weight: 800;
   color: #242776;

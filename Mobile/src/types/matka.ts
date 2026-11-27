@@ -117,7 +117,7 @@ export interface WalletTransaction {
   amountRupees: number;
   beforeBalance?: number;
   afterBalance?: number;
-  status: 'Completed' | 'Pending';
+  status: 'Completed' | 'Pending' | 'Rejected';
   timestamp: string;
 }
 

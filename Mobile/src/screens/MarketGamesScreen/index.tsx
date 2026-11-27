@@ -26,9 +26,9 @@ export const MarketGamesScreen: React.FC<MarketGamesScreenProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text variant="titleMedium" style={styles.headerTitle}>
+      {/* <Text variant="titleMedium" style={styles.headerTitle}>
         {market.name}
-      </Text>
+      </Text> */}
 
       <FlatList
         data={visibleGames}

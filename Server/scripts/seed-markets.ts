@@ -3,7 +3,7 @@ import { ObjectId } from "../src/db.ts";
 import {
   DEFAULT_RATE_CARD,
   DEFAULT_STAKE_LIMITS,
-} from "../../packages/matka-rules/src/index.ts";
+} from "../src/matka-rules/index.ts";
 import { client, connectDatabase } from "../src/db.ts";
 
 const markets = [

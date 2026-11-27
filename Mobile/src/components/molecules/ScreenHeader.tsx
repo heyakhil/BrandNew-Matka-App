@@ -46,8 +46,9 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    color: APP_COLORS.textPrimary,
+    color: '#111827',
     fontSize: 18,
     lineHeight: 22,
+    fontWeight: '800',
   },
 });

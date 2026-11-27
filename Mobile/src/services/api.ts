@@ -1,12 +1,14 @@
 import type { BetRequest, Slip } from '../../../packages/matka-rules/src/index';
 import { MARKET_GAME_OPTIONS } from '../data/mockData';
 import type {
+  BankDetails,
   BidRecord,
   GameTypeId,
   MarketItem,
   UserProfile,
   WalletTransaction,
 } from '../types/matka';
+import { sortMarketsByOpenTime } from '../utils/matkaHelpers';
 import { resolveApiUrl } from './apiConfig';
 
 interface Session {
@@ -55,6 +57,14 @@ interface EntryResponse {
   amountPaise: number;
   balanceAfterPaise: number;
   kind: 'bet' | 'win' | 'reversal' | 'refund' | 'adjustment';
+  createdAt: string;
+}
+interface WithdrawalRequestResponse {
+  _id: string;
+  amountPaise: number;
+  method: 'bank' | 'upi';
+  status: 'pending' | 'approved' | 'rejected';
+  adminNote?: string;
   createdAt: string;
 }
 
@@ -180,42 +190,47 @@ export async function loadAccount(
   transactions: WalletTransaction[];
   balanceRupees: number;
   profile: UserProfile;
+  bankDetails: BankDetails;
   referralCode: string;
 }> {
   try {
-    const [marketRows, betRows, entries, user] = await Promise.all([
+    const [marketRows, betRows, entries, withdrawalRows, user] = await Promise.all([
       request<MarketResponse[]>('/markets'),
       request<BetResponse[]>('/me/bets', token),
       request<EntryResponse[]>('/me/passbook', token),
+      request<WithdrawalRequestResponse[]>('/me/withdrawals', token).catch(() => []),
       request<{
         email: string;
         name: string;
         phone: string;
         referralCode: string;
         balancePaise: number;
+        bankDetails?: Partial<BankDetails> | null;
       }>('/me', token),
     ]);
-    const markets: MarketItem[] = marketRows.map(market => ({
-      id: market.id,
-      name: market.name,
-      resultLine: market.line,
-      openTime: market.openTime,
-      closeTime: market.closeTime,
-      openBidLastTime: market.openBidLastTime,
-      closeBidLastTime: market.closeBidLastTime,
-      status:
-        market.phase === 'preOpen'
-          ? 'open_running'
-          : market.phase === 'afterOpenCutoff'
-          ? 'close_running'
-          : 'closed',
-      category: 'main',
-      jodiChartUrl: market.jodiChartUrl,
-      pannaChartUrl: market.pannaChartUrl,
-      recentChart: market.recentChart,
-      rateCard: market.rateCard,
-      limits: market.limits,
-    }));
+    const markets: MarketItem[] = sortMarketsByOpenTime(
+      marketRows.map(market => ({
+        id: market.id,
+        name: market.name,
+        resultLine: market.line,
+        openTime: market.openTime,
+        closeTime: market.closeTime,
+        openBidLastTime: market.openBidLastTime,
+        closeBidLastTime: market.closeBidLastTime,
+        status:
+          market.phase === 'preOpen'
+            ? 'open_running'
+            : market.phase === 'afterOpenCutoff'
+            ? 'close_running'
+            : 'closed',
+        category: 'main',
+        jodiChartUrl: market.jodiChartUrl,
+        pannaChartUrl: market.pannaChartUrl,
+        recentChart: market.recentChart,
+        rateCard: market.rateCard,
+        limits: market.limits,
+      })),
+    );
     const nameById = new Map(markets.map(market => [market.id, market.name]));
     const bids: BidRecord[] = betRows.flatMap(bet =>
       bet.slips.map((priced, index) => ({
@@ -251,7 +266,7 @@ export async function loadAccount(
             : 'Pending',
       })),
     );
-    const transactions: WalletTransaction[] = entries.map(entry => ({
+    const entryTransactions: Array<WalletTransaction & { sortTime: number }> = entries.map(entry => ({
       id: entry._id,
       type:
         entry.kind === 'bet'
@@ -267,13 +282,42 @@ export async function loadAccount(
       afterBalance: entry.balanceAfterPaise / 100,
       status: 'Completed',
       timestamp: new Date(entry.createdAt).toLocaleString('en-IN'),
+      sortTime: new Date(entry.createdAt).getTime(),
     }));
+    const pendingOrRejectedWithdrawals: Array<WalletTransaction & { sortTime: number }> =
+      withdrawalRows
+        .filter(item => item.status !== 'approved')
+        .map(item => ({
+          id: `wd-${item._id}`,
+          type: 'withdraw',
+          title:
+            item.status === 'rejected'
+              ? `Withdrawal (${item.method.toUpperCase()}) - Rejected${item.adminNote ? `: ${item.adminNote}` : ''}`
+              : `Withdrawal Request (${item.method.toUpperCase()})`,
+          amountRupees: item.amountPaise / 100,
+          status: item.status === 'pending' ? 'Pending' : 'Rejected',
+          timestamp: new Date(item.createdAt).toLocaleString('en-IN'),
+          sortTime: new Date(item.createdAt).getTime(),
+        }));
+    const transactions: WalletTransaction[] = [
+      ...pendingOrRejectedWithdrawals,
+      ...entryTransactions,
+    ]
+      .sort((a, b) => b.sortTime - a.sortTime)
+      .map(({ sortTime: _sortTime, ...tx }) => tx);
     return {
       markets,
       bids,
       transactions,
       balanceRupees: user.balancePaise / 100,
       referralCode: user.referralCode,
+      bankDetails: {
+        accountHolder: user.bankDetails?.accountHolder ?? '',
+        bankName: user.bankDetails?.bankName ?? '',
+        accountNumber: user.bankDetails?.accountNumber ?? '',
+        ifscCode: user.bankDetails?.ifscCode ?? '',
+        upiId: user.bankDetails?.upiId ?? '',
+      },
       profile: {
         email: user.email ?? '',
         name: user.name || 'Royal Club Member',
@@ -282,6 +326,44 @@ export async function loadAccount(
     };
   } catch (error) {
     throw error;
+  }
+}
+
+export async function saveBankDetailsApi(
+  token: string,
+  details: BankDetails,
+): Promise<BankDetails> {
+  try {
+    const saved = await request<Partial<BankDetails>>(
+      '/me/bank-details',
+      token,
+      details,
+      'PATCH',
+    );
+    return {
+      accountHolder: saved.accountHolder ?? '',
+      bankName: saved.bankName ?? '',
+      accountNumber: saved.accountNumber ?? '',
+      ifscCode: saved.ifscCode ?? '',
+      upiId: saved.upiId ?? '',
+    };
+  } catch (error) {
+    throw requestError(error);
+  }
+}
+
+export async function submitWithdrawalRequest(
+  token: string,
+  amountRupees: number,
+  method: 'bank' | 'upi',
+): Promise<void> {
+  try {
+    await request<WithdrawalRequestResponse>('/me/withdrawals', token, {
+      amountRupees,
+      method,
+    });
+  } catch (error) {
+    throw requestError(error);
   }
 }
 

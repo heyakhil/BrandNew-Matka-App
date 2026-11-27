@@ -15,7 +15,8 @@ export const styles = StyleSheet.create({
   },
   subHeaderTitle: {
     flex: 1,
-    color: APP_COLORS.textPrimary,
+    color: '#111827',
+    fontSize: 17,
     fontWeight: '800',
   },
   controlsRow: {
@@ -147,7 +148,15 @@ export const styles = StyleSheet.create({
   resetBtn: {
     borderRadius: 10,
     marginTop: 10,
-    borderColor: APP_COLORS.border,
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+  },
+  resetBtnContent: {
+    height: 44,
+  },
+  resetBtnLabel: {
+    fontWeight: '800',
+    fontSize: 14,
   },
   keypadGrid: {
     flexDirection: 'row',
@@ -228,29 +237,44 @@ export const styles = StyleSheet.create({
     backgroundColor: APP_COLORS.secondary,
     borderTopWidth: 1,
     borderTopColor: APP_COLORS.border,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+    gap: 10,
   },
   statBlock: {
     flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
   },
   statLabel: {
     color: APP_COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
   },
   statValue: {
-    color: APP_COLORS.textPrimary,
+    color: '#111827',
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: '800',
   },
   statAmount: {
-    color: APP_COLORS.accent,
+    color: '#D97706',
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: '800',
   },
   placeBetBtn: {
+    flexShrink: 0,
     borderRadius: 24,
     minWidth: 124,
   },
+  placeBetContent: {
+    height: 44,
+    paddingHorizontal: 8,
+  },
   placeBetLabel: {
     fontWeight: '800',
+    fontSize: 14,
   },
 });

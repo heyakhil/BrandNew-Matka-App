@@ -4,7 +4,7 @@ import { Button, Card, Icon, Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_COLORS } from '../../theme/paperTheme';
 import type { MarketItem } from '../../types/matka';
-import { isRedJodiPair } from '../../utils/matkaHelpers';
+import { isRedJodiPair, sortMarketsByOpenTime } from '../../utils/matkaHelpers';
 
 interface GameChartScreenProps {
   markets: MarketItem[];
@@ -225,7 +225,7 @@ export const GameChartScreen: React.FC<GameChartScreenProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const mainMarkets = useMemo(
-    () => markets.filter(m => m.category === 'main'),
+    () => sortMarketsByOpenTime(markets.filter(m => m.category === 'main')),
     [markets],
   );
 
@@ -385,7 +385,8 @@ const styles = StyleSheet.create({
   },
   marketName: {
     flex: 1,
-    color: APP_COLORS.textPrimary,
+    color: '#111827',
+    fontSize: 15.5,
     fontWeight: '800',
   },
   btnGroup: {

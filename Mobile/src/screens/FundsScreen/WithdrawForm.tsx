@@ -13,13 +13,13 @@ import {
 import type { BankDetails, UserProfile } from '../../types/matka';
 import { styles } from './styles';
 
-type WithdrawMethod = 'bank' | 'upi';
+export type WithdrawMethod = 'bank' | 'upi';
 
 interface WithdrawFormProps {
   profile: UserProfile;
   balanceRupees: number;
   bankDetails: BankDetails;
-  onSubmit: (amount: number) => void;
+  onSubmit: (amount: number, method: WithdrawMethod) => Promise<void> | void;
   onDecline: () => void;
   onSupportPress: () => void;
 }
@@ -36,6 +36,7 @@ export const WithdrawForm: React.FC<WithdrawFormProps> = ({
   const [amountText, setAmountText] = useState('');
   const [method, setMethod] = useState<WithdrawMethod | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const validate = (amount: number): string | null => {
     if (!Number.isInteger(amount) || amount < MIN_WITHDRAW_RUPEES) {
@@ -57,15 +58,23 @@ export const WithdrawForm: React.FC<WithdrawFormProps> = ({
     return hasDetails ? null : `Add your ${method === 'bank' ? 'bank' : 'UPI'} details first.`;
   };
 
-  const handleSubmit = (): void => {
+  const handleSubmit = async (): Promise<void> => {
+    if (submitting) return;
     const validationError = validate(Number(amountText));
-    if (validationError) {
-      setError(validationError);
+    if (validationError || !method) {
+      setError(validationError ?? 'Select Bank or UPI.');
       return;
     }
-    onSubmit(Number(amountText));
-    setAmountText('');
-    setMethod(null);
+    setSubmitting(true);
+    try {
+      await onSubmit(Number(amountText), method);
+      setAmountText('');
+      setMethod(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to submit withdrawal request.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -105,8 +114,11 @@ export const WithdrawForm: React.FC<WithdrawFormProps> = ({
           ))}
         </View>
         <GradientButton
-          label="SEND REQUEST"
-          onPress={handleSubmit}
+          label={submitting ? 'SENDING...' : 'SEND REQUEST'}
+          onPress={() => {
+            handleSubmit().catch(() => {});
+          }}
+          disabled={submitting}
           height={50}
         />
       </ScrollView>

@@ -115,6 +115,30 @@ export interface Transaction {
   category: "deposit" | "withdrawal" | "credit" | "bet";
 }
 
+export interface WithdrawalPaymentDetails {
+  accountHolder?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  upiId?: string;
+}
+
+export interface WithdrawalRequestItem {
+  _id: string;
+  userId: string;
+  userName: string;
+  userPhone: string;
+  userEmail: string;
+  userBalancePaise: number;
+  amountPaise: number;
+  method: "bank" | "upi";
+  paymentDetails: WithdrawalPaymentDetails;
+  status: "pending" | "approved" | "rejected";
+  adminNote: string;
+  reviewedAt?: string;
+  createdAt: string;
+}
+
 export interface UserReport {
   user: User;
   todayBidPaise: number;
@@ -159,4 +183,20 @@ export function rupees(paise: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+export function timeMinutes(time24: string): number {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time24.trim());
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+export function formatTime12h(time24: string): string {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time24.trim());
+  if (!match) return time24;
+  const hours24 = Number(match[1]);
+  const minutes = match[2];
+  const period = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 || 12;
+  return `${String(hours12).padStart(2, "0")}:${minutes} ${period}`;
 }

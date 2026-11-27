@@ -10,6 +10,7 @@ import {
   Text,
   TouchableRipple,
 } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FormInput } from '../../components/molecules/FormInput';
 import { GAME_WIN_RATES } from '../../data/mockData';
 import { APP_COLORS } from '../../theme/paperTheme';
@@ -46,6 +47,20 @@ const BULK_DIGIT_ORDER = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 const PANNA_BULK_DIGIT_ORDER = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const ALL_JODIS = Array.from({ length: 100 }, (_, i) => String(i).padStart(2, '0'));
 
+const ResetBidsButton: React.FC<{ onPress: () => void }> = ({ onPress }) => (
+  <Button
+    mode="contained-tonal"
+    icon="refresh"
+    onPress={onPress}
+    buttonColor="#FEE2E2"
+    textColor="#B91C1C"
+    style={styles.resetBtn}
+    contentStyle={styles.resetBtnContent}
+    labelStyle={styles.resetBtnLabel}>
+    Reset
+  </Button>
+);
+
 export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
   market,
   game,
@@ -53,6 +68,7 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
   onBack,
   onPlaceBets,
 }) => {
+  const insets = useSafeAreaInsets();
   const isCloseOnly = market.status === 'close_running';
   const [side, setSide] = useState<SessionSide>(isCloseOnly ? 'close' : 'open');
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
@@ -371,13 +387,7 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                 </Surface>
               ))}
             </View>
-            <Button
-              mode="outlined"
-              onPress={handleReset}
-              textColor={APP_COLORS.textPrimary}
-              style={styles.resetBtn}>
-              Reset
-            </Button>
+            <ResetBidsButton onPress={handleReset} />
           </View>
         ) : game.id === 'SDB' || game.id === 'JDB' || game.id === 'SPB' || game.id === 'DPB' ? (
           <View>
@@ -455,13 +465,7 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                   </View>
                 )}
 
-                <Button
-                  mode="outlined"
-                  onPress={handleReset}
-                  textColor={APP_COLORS.textPrimary}
-                  style={styles.resetBtn}>
-                  Reset
-                </Button>
+                <ResetBidsButton onPress={handleReset} />
               </Card.Content>
             </Card>
 
@@ -608,13 +612,7 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
                   Add Bid
                 </Button>
 
-                <Button
-                  mode="outlined"
-                  onPress={handleReset}
-                  textColor={APP_COLORS.textPrimary}
-                  style={styles.resetBtn}>
-                  Reset
-                </Button>
+                <ResetBidsButton onPress={handleReset} />
               </Card.Content>
             </Card>
 
@@ -653,36 +651,52 @@ export const PlayGameScreen: React.FC<PlayGameScreenProps> = ({
         )}
       </ScrollView>
 
-      <Surface style={styles.bottomBar} elevation={4}>
+      <Surface
+        style={[
+          styles.bottomBar,
+          { paddingBottom: Math.max(insets.bottom, 12) },
+        ]}
+        elevation={4}>
         <View style={styles.statBlock}>
-          <Text variant="labelSmall" style={styles.statLabel}>
+          <Text variant="labelSmall" style={styles.statLabel} numberOfLines={1}>
             Total Bids
           </Text>
-          <Text variant="titleMedium" style={styles.statValue}>
+          <Text
+            variant="titleMedium"
+            style={styles.statValue}
+            numberOfLines={1}
+            adjustsFontSizeToFit>
             {totalBidsCount}
           </Text>
         </View>
         <View style={styles.statBlock}>
-          <Text variant="labelSmall" style={styles.statLabel}>
+          <Text variant="labelSmall" style={styles.statLabel} numberOfLines={1}>
             Total Amount
           </Text>
-          <Text variant="titleMedium" style={styles.statAmount}>
+          <Text
+            variant="titleMedium"
+            style={styles.statAmount}
+            numberOfLines={1}
+            adjustsFontSizeToFit>
             {formatRupees(totalAmount)}
           </Text>
         </View>
         <Button
           mode="contained"
           disabled={totalBidsCount === 0 || submitting}
-          onPress={() => { void handleSubmitAll(); }}
-          buttonColor={
-            totalBidsCount > 0 ? APP_COLORS.accent : APP_COLORS.border
-          }
-          textColor={
-            totalBidsCount > 0
-              ? APP_COLORS.onAccent
-              : APP_COLORS.textSecondary
-          }
+          onPress={() => {
+            void handleSubmitAll();
+          }}
+          buttonColor={APP_COLORS.accent}
+          textColor={APP_COLORS.onAccent}
+          theme={{
+            colors: {
+              surfaceDisabled: '#E2E8F0',
+              onSurfaceDisabled: '#475569',
+            },
+          }}
           style={styles.placeBetBtn}
+          contentStyle={styles.placeBetContent}
           labelStyle={styles.placeBetLabel}>
           Place Bet
         </Button>

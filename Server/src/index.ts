@@ -20,7 +20,7 @@ import {
   DEFAULT_STAKE_LIMITS,
   buildFullResult,
   buildOpenResult,
-} from "../../packages/matka-rules/src/index.ts";
+} from "./matka-rules/index.ts";
 import {
   checkPassword,
   currentUser,
@@ -33,12 +33,15 @@ import { finishPasswordReset, startPasswordReset, verifyPasswordReset } from "./
 import { pruneExpiredAuthRecords, startRegistration, verifyRegistration } from "./registration.ts";
 import {
   ApiError,
+  acceptWithdrawalRequest,
   adjustWallet,
   bettingPhase,
   cancelMarketDay,
+  createWithdrawalRequest,
   declareResult,
   marketDate,
   placeBets,
+  rejectWithdrawalRequest,
   reverseResult,
 } from "./game.ts";
 import {
@@ -332,7 +335,70 @@ app.get("/api/me", playerAuth, (_request, response) => {
     dob: user.dob ?? "",
     referralCode: user.referralCode ?? "",
     balancePaise: user.balancePaise,
+    bankDetails: user.bankDetails ?? null,
   });
+});
+
+app.patch("/api/me/bank-details", playerAuth, async (request, response) => {
+  try {
+    const input = z
+      .object({
+        accountHolder: z.string().trim().max(120).optional(),
+        bankName: z.string().trim().max(120).optional(),
+        accountNumber: z.string().trim().max(40).optional(),
+        ifscCode: z.string().trim().max(20).optional(),
+        upiId: z.string().trim().max(120).optional(),
+      })
+      .parse(request.body);
+    const user = currentUser(response);
+    const merged = {
+      accountHolder: input.accountHolder ?? user.bankDetails?.accountHolder ?? "",
+      bankName: input.bankName ?? user.bankDetails?.bankName ?? "",
+      accountNumber: input.accountNumber ?? user.bankDetails?.accountNumber ?? "",
+      ifscCode: (input.ifscCode ?? user.bankDetails?.ifscCode ?? "").toUpperCase(),
+      upiId: input.upiId ?? user.bankDetails?.upiId ?? "",
+    };
+    await data.users.updateOne(
+      { _id: user._id },
+      { $set: { bankDetails: merged } }
+    );
+    response.json(merged);
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.get("/api/me/withdrawals", playerAuth, async (_request, response) => {
+  try {
+    const rows = await data.withdrawalRequests
+      .find({ userId: currentUser(response)._id })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .toArray();
+    response.json(rows);
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.post("/api/me/withdrawals", playerAuth, async (request, response) => {
+  try {
+    const { amountRupees, method } = z
+      .object({
+        amountRupees: z.number().int().positive().max(10_000_000),
+        method: z.enum(["bank", "upi"]),
+      })
+      .parse(request.body);
+    const created = await createWithdrawalRequest(
+      data,
+      currentUser(response)._id,
+      amountRupees * 100,
+      method
+    );
+    response.status(201).json(created);
+  } catch (error) {
+    handleError(error, response);
+  }
 });
 
 app.patch("/api/me", playerAuth, async (request, response) => {
@@ -994,6 +1060,105 @@ app.get("/api/admin/reports/winners", adminAuth, requireAdminPermission("reports
   }
 });
 
+app.get("/api/admin/withdrawals", adminAuth, requireAdminPermission("transactions"), async (_request, response) => {
+  try {
+    const [rows] = await sqlPool.execute<RowDataPacket[]>(
+      `SELECT w.id, w.user_id, w.amount_paise, w.method, w.payment_details, w.status, w.admin_note, w.reviewed_at, w.created_at,
+              COALESCE(u.name, u.phone, u.email) AS user_name, u.phone AS user_phone, u.email AS user_email, u.balance_paise AS user_balance_paise
+       FROM withdrawal_requests w
+       INNER JOIN users u ON u.id = w.user_id
+       ORDER BY CASE WHEN w.status = 'pending' THEN 0 WHEN w.status = 'approved' THEN 1 ELSE 2 END, w.created_at DESC
+       LIMIT 200`
+    );
+    response.json(
+      rows.map((row) => ({
+        _id: row.id,
+        userId: row.user_id,
+        userName: row.user_name,
+        userPhone: row.user_phone ?? "",
+        userEmail: row.user_email ?? "",
+        userBalancePaise: Number(row.user_balance_paise ?? 0),
+        amountPaise: Number(row.amount_paise),
+        method: row.method as "bank" | "upi",
+        paymentDetails:
+          typeof row.payment_details === "string"
+            ? JSON.parse(row.payment_details)
+            : row.payment_details ?? {},
+        status: row.status as "pending" | "approved" | "rejected",
+        adminNote: row.admin_note ?? "",
+        reviewedAt: row.reviewed_at,
+        createdAt: row.created_at,
+      }))
+    );
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.post("/api/admin/withdrawals/:id/accept", adminAuth, requireAdminPermission("transactions"), async (request, response) => {
+  try {
+    const id = new ObjectId(objectIdSchema.parse(request.params.id));
+    const body = z.object({ note: z.string().trim().max(255).optional() }).safeParse(request.body ?? {});
+    const note = body.success ? body.data.note : undefined;
+    const updated = await acceptWithdrawalRequest(
+      data,
+      id,
+      currentUser(response)._id,
+      note
+    );
+    const formattedAmount = (updated.amountPaise / 100).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    await sendUserPushNotification(
+      data,
+      updated.userId,
+      "Withdrawal Approved 💸",
+      `Your withdrawal request of ₹${formattedAmount} has been approved.`,
+      {
+        type: "withdrawal_approved",
+        amountPaise: String(updated.amountPaise),
+        requestId: updated._id.toHexString(),
+      }
+    );
+    response.json(updated);
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
+app.post("/api/admin/withdrawals/:id/reject", adminAuth, requireAdminPermission("transactions"), async (request, response) => {
+  try {
+    const id = new ObjectId(objectIdSchema.parse(request.params.id));
+    const body = z.object({ note: z.string().trim().max(255).optional() }).safeParse(request.body ?? {});
+    const note = body.success ? body.data.note : undefined;
+    const updated = await rejectWithdrawalRequest(
+      data,
+      id,
+      currentUser(response)._id,
+      note
+    );
+    const formattedAmount = (updated.amountPaise / 100).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    await sendUserPushNotification(
+      data,
+      updated.userId,
+      "Withdrawal Rejected",
+      `Your withdrawal request of ₹${formattedAmount} was rejected${note ? `: ${note}` : "."}`,
+      {
+        type: "withdrawal_rejected",
+        amountPaise: String(updated.amountPaise),
+        requestId: updated._id.toHexString(),
+      }
+    );
+    response.json(updated);
+  } catch (error) {
+    handleError(error, response);
+  }
+});
+
 app.get("/api/admin/transactions", adminAuth, requireAdminPermission("transactions"), async (request, response) => {
   try {
     const type = z.enum(["all", "deposit", "withdrawal"]).default("all").parse(request.query.type);
@@ -1295,6 +1460,7 @@ const MASTER_RESET_TABLES = [
   "registration_challenges",
   "bet_batches",
   "payment_orders",
+  "withdrawal_requests",
   "wallet_entries",
   "bets",
   "market_days",

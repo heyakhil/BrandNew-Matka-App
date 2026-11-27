@@ -8,6 +8,11 @@ Requires Node 22+ and MySQL 8.0+ with InnoDB tables.
 4. Run `npm run seed:markets` for the starter market schedule.
 5. Run `npm run dev`.
 
+For Hostinger Node.js deployment, select the `Server` directory as the
+application root, use `server.js` as the entry file, and `npm start` as the
+start command. The JavaScript entry file loads the TypeScript server through
+the production `tsx` runtime.
+
 Player sign-up and password reset use Renflair four-digit SMS OTPs. Add `RENFLAIR_API_KEY` to `Server/.env`; the key stays on the server. Each code expires after five minutes and allows five attempts. A verified password reset invalidates older app sessions.
 
 Tables and indexes are created on the first connection. Use a separate MySQL database for integration tests and set `MYSQL_TEST_DATABASE` before `npm run test:integration`.

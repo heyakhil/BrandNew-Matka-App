@@ -7,7 +7,7 @@ import { PromoHeroBanner } from '../../components/molecules/PromoHeroBanner';
 import { InfoModal } from '../../components/organisms/InfoModal';
 import { QuickActionGrid } from '../../components/organisms/QuickActionGrid';
 import type { MarketItem } from '../../types/matka';
-import { formatDisplayTime } from '../../utils/matkaHelpers';
+import { formatDisplayTime, sortMarketsByOpenTime } from '../../utils/matkaHelpers';
 import { styles } from './styles';
 
 interface HomeScreenProps {
@@ -35,7 +35,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   const [closedMarket, setClosedMarket] = useState<MarketItem | null>(null);
   const mainMarkets = useMemo(
-    () => markets.filter(m => m.category === 'main'),
+    () => sortMarketsByOpenTime(markets.filter(m => m.category === 'main')),
     [markets],
   );
 

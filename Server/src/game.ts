@@ -11,16 +11,18 @@ import {
   type BetRequest,
   type BettingPhase,
   type MarketResult,
-} from "../../packages/matka-rules/src/index.ts";
+} from "./matka-rules/index.ts";
 import {
   client,
   collections,
+  type BankDetails,
   type Bet,
   type Market,
   type MarketDay,
   type StoredSlip,
   type User,
   type WalletEntry,
+  type WithdrawalRequest,
 } from "./db.ts";
 
 type Data = ReturnType<typeof collections>;
@@ -574,6 +576,187 @@ export async function adjustWallet(
         );
       });
     });
+  } catch (error) {
+    throw error;
+  }
+}
+
+export async function createWithdrawalRequest(
+  data: Data,
+  userId: ObjectId,
+  amountPaise: number,
+  method: "bank" | "upi"
+): Promise<WithdrawalRequest> {
+  try {
+    if (!Number.isSafeInteger(amountPaise) || amountPaise <= 0) {
+      throw new ApiError(400, "Invalid withdrawal amount.");
+    }
+    let created: WithdrawalRequest | undefined;
+    await client.withSession(async (session) => {
+      await session.withTransaction(async () => {
+        const user = await data.users.findOne(
+          { _id: userId, role: "player", disabled: false },
+          { session, lock: true }
+        );
+        if (!user) throw new ApiError(404, "Active player not found.");
+
+        const settings = await data.settings.findOne({}, { session });
+        const minPaise = settings?.minWithdrawalPaise ?? 50_000;
+        const maxPaise = settings?.maxWithdrawalPaise ?? 5_000_000;
+        if (amountPaise < minPaise || amountPaise > maxPaise) {
+          throw new ApiError(
+            400,
+            `Withdrawal amount must be between ₹${minPaise / 100} and ₹${maxPaise / 100}.`
+          );
+        }
+
+        const bankDetails: BankDetails = user.bankDetails ?? {};
+        const paymentDetails: BankDetails =
+          method === "bank"
+            ? {
+                accountHolder: bankDetails.accountHolder?.trim() ?? "",
+                bankName: bankDetails.bankName?.trim() ?? "",
+                accountNumber: bankDetails.accountNumber?.trim() ?? "",
+                ifscCode: bankDetails.ifscCode?.trim().toUpperCase() ?? "",
+              }
+            : {
+                upiId: bankDetails.upiId?.trim() ?? "",
+              };
+
+        if (
+          method === "bank" &&
+          (!paymentDetails.accountHolder ||
+            !paymentDetails.accountNumber ||
+            !paymentDetails.ifscCode)
+        ) {
+          throw new ApiError(400, "Add your bank details first.");
+        }
+        if (method === "upi" && !paymentDetails.upiId) {
+          throw new ApiError(400, "Add your UPI details first.");
+        }
+
+        const pendingRequests = await data.withdrawalRequests
+          .find({ userId, status: "pending" }, { session, lock: true })
+          .toArray();
+        const pendingTotal = safeSum(
+          pendingRequests.map((item) => item.amountPaise)
+        );
+        if (user.balancePaise - pendingTotal < amountPaise) {
+          throw new ApiError(
+            409,
+            pendingTotal > 0
+              ? "Insufficient available balance after pending withdrawal requests."
+              : "Insufficient wallet balance."
+          );
+        }
+
+        const entry: WithdrawalRequest = {
+          _id: new ObjectId(),
+          userId,
+          amountPaise,
+          method,
+          paymentDetails,
+          status: "pending",
+          createdAt: new Date(),
+        };
+        await data.withdrawalRequests.insertOne(entry, { session });
+        created = entry;
+      });
+    });
+    if (!created) throw new ApiError(500, "Could not create withdrawal request.");
+    return created;
+  } catch (error) {
+    throw error;
+  }
+}
+
+export async function acceptWithdrawalRequest(
+  data: Data,
+  requestId: ObjectId,
+  adminId: ObjectId,
+  adminNote?: string
+): Promise<WithdrawalRequest> {
+  try {
+    let updated: WithdrawalRequest | undefined;
+    await client.withSession(async (session) => {
+      await session.withTransaction(async () => {
+        const req = await data.withdrawalRequests.findOne(
+          { _id: requestId },
+          { session, lock: true }
+        );
+        if (!req) throw new ApiError(404, "Withdrawal request not found.");
+        if (req.status !== "pending") {
+          throw new ApiError(409, "Withdrawal request has already been processed.");
+        }
+        await moveWallet(
+          data,
+          session,
+          req.userId,
+          -req.amountPaise,
+          "adjustment",
+          `WD-${req._id.toHexString()}`
+        );
+        const reviewedAt = new Date();
+        const saved = await data.withdrawalRequests.findOneAndUpdate(
+          { _id: requestId, status: "pending" },
+          {
+            $set: {
+              status: "approved",
+              reviewedBy: adminId,
+              reviewedAt,
+              ...(adminNote?.trim() ? { adminNote: adminNote.trim() } : {}),
+            },
+          },
+          { returnDocument: "after", session }
+        );
+        if (!saved) throw new ApiError(409, "Withdrawal request has already been processed.");
+        updated = saved;
+      });
+    });
+    if (!updated) throw new ApiError(500, "Could not approve withdrawal request.");
+    return updated;
+  } catch (error) {
+    throw error;
+  }
+}
+
+export async function rejectWithdrawalRequest(
+  data: Data,
+  requestId: ObjectId,
+  adminId: ObjectId,
+  adminNote?: string
+): Promise<WithdrawalRequest> {
+  try {
+    let updated: WithdrawalRequest | undefined;
+    await client.withSession(async (session) => {
+      await session.withTransaction(async () => {
+        const req = await data.withdrawalRequests.findOne(
+          { _id: requestId },
+          { session, lock: true }
+        );
+        if (!req) throw new ApiError(404, "Withdrawal request not found.");
+        if (req.status !== "pending") {
+          throw new ApiError(409, "Withdrawal request has already been processed.");
+        }
+        const reviewedAt = new Date();
+        const saved = await data.withdrawalRequests.findOneAndUpdate(
+          { _id: requestId, status: "pending" },
+          {
+            $set: {
+              status: "rejected",
+              reviewedBy: adminId,
+              reviewedAt,
+              ...(adminNote?.trim() ? { adminNote: adminNote.trim() } : {}),
+            },
+          },
+          { returnDocument: "after", session }
+        );
+        if (!saved) throw new ApiError(409, "Withdrawal request has already been processed.");
+        updated = saved;
+      });
+    });
+    if (!updated) throw new ApiError(500, "Could not reject withdrawal request.");
+    return updated;
   } catch (error) {
     throw error;
   }

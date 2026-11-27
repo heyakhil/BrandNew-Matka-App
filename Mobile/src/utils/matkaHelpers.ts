@@ -246,14 +246,45 @@ export function formatRupees(amount: number): string {
   })}`;
 }
 
+export function parseTimeMinutes(time: string | undefined): number {
+  if (!time) return Number.MAX_SAFE_INTEGER;
+  const trimmed = time.trim();
+  const match12 = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(trimmed);
+  if (match12) {
+    const rawHour = Number(match12[1]);
+    const minutes = Number(match12[2]);
+    if (rawHour < 1 || rawHour > 12 || minutes > 59) return Number.MAX_SAFE_INTEGER;
+    const isPm = match12[3].toUpperCase() === 'PM';
+    const hours24 = (rawHour % 12) + (isPm ? 12 : 0);
+    return hours24 * 60 + minutes;
+  }
+  const match24 = /^(\d{1,2}):(\d{2})$/.exec(trimmed);
+  if (!match24) return Number.MAX_SAFE_INTEGER;
+  const hours24 = Number(match24[1]);
+  const minutes = Number(match24[2]);
+  if (hours24 > 23 || minutes > 59) return Number.MAX_SAFE_INTEGER;
+  return hours24 * 60 + minutes;
+}
+
 export function formatDisplayTime(time: string | undefined): string {
   if (!time) return '—';
-  const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
-  if (!match) return time.trim();
-  const hours24 = Number(match[1]);
-  const minutes = match[2];
-  if (hours24 > 23) return time.trim();
+  const totalMinutes = parseTimeMinutes(time);
+  if (totalMinutes === Number.MAX_SAFE_INTEGER) return time.trim();
+  const hours24 = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
   const period = hours24 >= 12 ? 'PM' : 'AM';
   const hours12 = hours24 % 12 || 12;
-  return `${String(hours12).padStart(2, '0')}:${minutes} ${period}`;
+  return `${String(hours12).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
+}
+
+export function sortMarketsByOpenTime<
+  T extends { openTime: string; closeTime?: string; name?: string },
+>(markets: readonly T[]): T[] {
+  return [...markets].sort((a, b) => {
+    const openDiff = parseTimeMinutes(a.openTime) - parseTimeMinutes(b.openTime);
+    if (openDiff !== 0) return openDiff;
+    const closeDiff = parseTimeMinutes(a.closeTime) - parseTimeMinutes(b.closeTime);
+    if (closeDiff !== 0) return closeDiff;
+    return (a.name ?? '').localeCompare(b.name ?? '');
+  });
 }

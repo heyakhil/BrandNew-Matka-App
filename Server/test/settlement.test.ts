@@ -6,7 +6,7 @@ import { ObjectId } from "../src/id.ts";
 import {
   DEFAULT_RATE_CARD,
   DEFAULT_STAKE_LIMITS,
-} from "../../packages/matka-rules/src/index.ts";
+} from "../src/matka-rules/index.ts";
 import type { Market, User } from "../src/db.ts";
 
 test(
